@@ -56,5 +56,6 @@ add_subdirectory(ra.bpay)
 add_subdirectory(ra.resources)
 add_subdirectory(ra.authex)
 add_subdirectory(ra.claim)
+add_subdirectory(ra.org)
 
 add_subdirectory(test_contracts)
