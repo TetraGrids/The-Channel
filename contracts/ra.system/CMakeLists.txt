@@ -2,6 +2,7 @@ add_contract(
   ra.system
   ra.system
   ${CMAKE_CURRENT_SOURCE_DIR}/src/ra.system.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/apps.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/delegate_bandwidth.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/exchange_state.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/finalizer_key.cpp

@@ -8,8 +8,14 @@ namespace rasystem {
    using eosio::token;
    using eosio::seconds;
 
+   void system_contract::assert_rex_disabled() const
+   {
+      check( false, "REX is disabled; use powerup or ra.resources for CPU/NET" );
+   }
+
    void system_contract::setrexmature(const std::optional<uint32_t> num_of_maturity_buckets, const std::optional<bool> sell_matured_rex, const std::optional<bool> buy_rex_to_savings )
    {
+      assert_rex_disabled();
       require_auth(get_self());
 
       auto state = _rexmaturity.get_or_default();
@@ -25,6 +31,7 @@ namespace rasystem {
 
    void system_contract::deposit( const name& owner, const asset& amount )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       check( amount.symbol == core_symbol(), "must deposit core token" );
@@ -39,6 +46,7 @@ namespace rasystem {
 
    void system_contract::withdraw( const name& owner, const asset& amount )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       check( amount.symbol == core_symbol(), "must withdraw core token" );
@@ -54,6 +62,7 @@ namespace rasystem {
 
    void system_contract::buyrex( const name& from, const asset& amount )
    {
+      assert_rex_disabled();
       require_auth( from );
 
       check( amount.symbol == core_symbol(), "asset must be core token" );
@@ -74,6 +83,7 @@ namespace rasystem {
 
    void system_contract::unstaketorex( const name& owner, const name& receiver, const asset& from_net, const asset& from_cpu )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       check( from_net.symbol == core_symbol() && from_cpu.symbol == core_symbol(), "asset must be core token" );
@@ -117,6 +127,7 @@ namespace rasystem {
 
    void system_contract::sellrex( const name& from, const asset& rex )
    {
+      assert_rex_disabled();
       require_auth( from );
       sell_rex( from, rex );
       process_sell_matured_rex( from );
@@ -172,6 +183,7 @@ namespace rasystem {
 
    void system_contract::cnclrexorder( const name& owner )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       auto itr = _rexorders.require_find( owner.value, "no sellrex order is scheduled" );
@@ -181,6 +193,7 @@ namespace rasystem {
 
    void system_contract::rentcpu( const name& from, const name& receiver, const asset& loan_payment, const asset& loan_fund )
    {
+      assert_rex_disabled();
       require_auth( from );
 
       rex_cpu_loan_table cpu_loans( get_self(), get_self().value );
@@ -190,6 +203,7 @@ namespace rasystem {
 
    void system_contract::rentnet( const name& from, const name& receiver, const asset& loan_payment, const asset& loan_fund )
    {
+      assert_rex_disabled();
       require_auth( from );
 
       rex_net_loan_table net_loans( get_self(), get_self().value );
@@ -199,6 +213,7 @@ namespace rasystem {
 
    void system_contract::fundcpuloan( const name& from, uint64_t loan_num, const asset& payment )
    {
+      assert_rex_disabled();
       require_auth( from );
 
       rex_cpu_loan_table cpu_loans( get_self(), get_self().value );
@@ -207,6 +222,7 @@ namespace rasystem {
 
    void system_contract::fundnetloan( const name& from, uint64_t loan_num, const asset& payment )
    {
+      assert_rex_disabled();
       require_auth( from );
 
       rex_net_loan_table net_loans( get_self(), get_self().value );
@@ -215,6 +231,7 @@ namespace rasystem {
 
    void system_contract::defcpuloan( const name& from, uint64_t loan_num, const asset& amount )
    {
+      assert_rex_disabled();
       require_auth( from );
 
       rex_cpu_loan_table cpu_loans( get_self(), get_self().value );
@@ -223,6 +240,7 @@ namespace rasystem {
 
    void system_contract::defnetloan( const name& from, uint64_t loan_num, const asset& amount )
    {
+      assert_rex_disabled();
       require_auth( from );
 
       rex_net_loan_table net_loans( get_self(), get_self().value );
@@ -231,6 +249,7 @@ namespace rasystem {
 
    void system_contract::updaterex( const name& owner )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       runrex(2);
@@ -257,6 +276,7 @@ namespace rasystem {
 
    void system_contract::setrex( const asset& balance )
    {
+      assert_rex_disabled();
       require_auth( "ra"_n );
 
       check( balance.amount > 0, "balance must be set to have a positive amount" );
@@ -269,6 +289,7 @@ namespace rasystem {
 
    void system_contract::rexexec( const name& user, uint16_t max )
    {
+      assert_rex_disabled();
       require_auth( user );
 
       runrex( max );
@@ -276,6 +297,7 @@ namespace rasystem {
 
    void system_contract::consolidate( const name& owner )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       runrex(2);
@@ -287,6 +309,7 @@ namespace rasystem {
 
    void system_contract::mvtosavings( const name& owner, const asset& rex )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       runrex(2);
@@ -321,6 +344,7 @@ namespace rasystem {
 
    void system_contract::mvfrsavings( const name& owner, const asset& rex )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       runrex(2);
@@ -344,6 +368,7 @@ namespace rasystem {
 
    void system_contract::closerex( const name& owner )
    {
+      assert_rex_disabled();
       require_auth( owner );
 
       if ( rex_system_initialized() )
@@ -388,6 +413,7 @@ namespace rasystem {
     */
    void system_contract::donatetorex( const name& payer, const asset& quantity, const std::string& memo )
    {
+      assert_rex_disabled();
       require_auth( payer );
       check( rex_available(), "rex system is not initialized" );
       check( quantity.symbol == core_symbol(), "quantity must be core token" );

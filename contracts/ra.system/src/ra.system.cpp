@@ -30,6 +30,9 @@ namespace rasystem {
     _global4(get_self(), get_self().value),
     _schedules(get_self(), get_self().value),
     _rammarket(get_self(), get_self().value),
+    _globalram(get_self(), get_self().value),
+    _usersram(get_self(), get_self().value),
+    _apps(get_self(), get_self().value),
     _rexpool(get_self(), get_self().value),
     _rexretpool(get_self(), get_self().value),
     _rexretbuckets(get_self(), get_self().value),
@@ -580,12 +583,15 @@ namespace rasystem {
          m.supply.symbol = ramcore_symbol;
          m.base.balance.amount = int64_t(_gstate.free_ram());
          m.base.balance.symbol = ram_symbol;
-         m.quote.balance.amount = system_token_supply.amount / 1000;
+         m.quote.balance.amount = 0;
          m.quote.balance.symbol = core;
       });
 
-      token::open_action open_act{ token_account, { {get_self(), active_permission} } };
-      open_act.send( rex_account, core, get_self() );
+      eosio_global_stateram ramcfg;
+      ramcfg.ram_price_per_byte = asset{ default_ram_price_amt, core };
+      ramcfg.max_per_user_bytes = default_ram_user_cap;
+      ramcfg.ram_fee_percent    = default_ram_fee_pct;
+      _globalram.set( ramcfg, get_self() );
    }
 
 } /// ra.system

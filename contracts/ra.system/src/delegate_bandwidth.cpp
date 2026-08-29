@@ -5,6 +5,8 @@
 #include <eosio/serialize.hpp>
 #include <eosio/transaction.hpp>
 
+#include <limits>
+
 #include <ra.system/ra.system.hpp>
 #include <ra.token/ra.token.hpp>
 
@@ -19,16 +21,91 @@ namespace rasystem {
    using eosio::time_point_sec;
    using eosio::token;
 
+   eosio_global_stateram system_contract::ram_config() const {
+      auto cfg = _globalram.get_or_default();
+      if ( cfg.ram_price_per_byte.amount <= 0 ) {
+         cfg.ram_price_per_byte = asset{ default_ram_price_amt, core_symbol() };
+      } else if ( cfg.ram_price_per_byte.symbol != core_symbol() ) {
+         cfg.ram_price_per_byte.symbol = core_symbol();
+      }
+      if ( cfg.max_per_user_bytes == 0 ) {
+         cfg.max_per_user_bytes = default_ram_user_cap;
+      }
+      return cfg;
+   }
+
+   int64_t system_contract::purchased_ram_cap( const name& owner, const eosio_global_stateram& cfg ) const {
+      auto itr = _usersram.find( owner.value );
+      if ( itr != _usersram.end() && itr->ramlimit > 0 ) {
+         return itr->ramlimit;
+      }
+      return static_cast<int64_t>( cfg.max_per_user_bytes );
+   }
+
+   void system_contract::assert_under_ram_cap( const name& owner, int64_t additional_bytes, const eosio_global_stateram& cfg ) const {
+      auto itr = _usersram.find( owner.value );
+      const int64_t current = ( itr == _usersram.end() ) ? 0 : itr->ram_bytes;
+      check( additional_bytes <= std::numeric_limits<int64_t>::max() - current, "ram bytes overflow" );
+      check( current + additional_bytes <= purchased_ram_cap( owner, cfg ), "purchased ram exceeds the per-account cap" );
+   }
+
+   void system_contract::credit_purchased_ram( const name& owner, int64_t bytes, const asset& cost ) {
+      auto itr = _usersram.find( owner.value );
+      if ( itr == _usersram.end() ) {
+         _usersram.emplace( owner, [&]( auto& row ) {
+            row.owner     = owner;
+            row.ram_bytes = bytes;
+            row.quantity  = cost;
+            row.ramlimit  = 0;
+         });
+      } else {
+         _usersram.modify( itr, same_payer, [&]( auto& row ) {
+            row.ram_bytes += bytes;
+            row.quantity  += cost;
+         });
+      }
+   }
+
+   asset system_contract::debit_purchased_ram( const name& owner, int64_t bytes ) {
+      auto itr = _usersram.find( owner.value );
+      check( itr != _usersram.end(), "no purchased ram to sell" );
+      check( bytes <= itr->ram_bytes, "insufficient purchased ram" );
+
+      const int128_t cost_i = ( int128_t( itr->quantity.amount ) * bytes ) / itr->ram_bytes;
+      check( cost_i <= std::numeric_limits<int64_t>::max(), "ram cost overflow" );
+      asset refund{ static_cast<int64_t>( cost_i ), itr->quantity.symbol };
+
+      _usersram.modify( itr, same_payer, [&]( auto& row ) {
+         row.ram_bytes -= bytes;
+         row.quantity  -= refund;
+      });
+      if ( itr->ram_bytes == 0 && itr->ramlimit == 0 ) {
+         _usersram.erase( itr );
+      }
+      return refund;
+   }
+
+   void system_contract::transfer_purchased_ram( const name& from, const name& to, int64_t bytes ) {
+      const asset moved = debit_purchased_ram( from, bytes );
+      if ( to != null_account ) {
+         credit_purchased_ram( to, bytes, moved );
+      }
+   }
+
    /**
-    *  This action will buy an exact amount of ram and bill the payer the current market price.
+    *  This action will buy an exact amount of ram and bill the payer the current fixed price plus fee.
     */
    action_return_buyram system_contract::buyrambytes( const name& payer, const name& receiver, uint32_t bytes ) {
-      auto itr = _rammarket.find(ramcore_symbol.raw());
-      const int64_t ram_reserve   = itr->base.balance.amount;
-      const int64_t eos_reserve   = itr->quote.balance.amount;
-      const int64_t cost          = exchange_state::get_bancor_input( ram_reserve, eos_reserve, bytes );
-      const int64_t cost_plus_fee = cost / double(0.995);
-      return buyram( payer, receiver, asset{ cost_plus_fee, core_symbol() } );
+      check( bytes > 0, "must purchase a positive amount" );
+      const auto cfg = ram_config();
+      check( cfg.ram_fee_percent < ram_fee_precision, "invalid ram fee percent" );
+
+      const int128_t net_cost = int128_t( bytes ) * cfg.ram_price_per_byte.amount;
+      check( net_cost > 0, "ram price is too low for this purchase" );
+      const int128_t denom = ram_fee_precision - cfg.ram_fee_percent;
+      const int128_t gross = ( net_cost * ram_fee_precision + denom - 1 ) / denom;
+      check( gross <= std::numeric_limits<int64_t>::max(), "ram cost overflow" );
+      return buyram( payer, receiver, asset{ static_cast<int64_t>( gross ), core_symbol() } );
    }
 
    /**
@@ -39,12 +116,9 @@ namespace rasystem {
    }
 
    /**
-    *  When buying ram the payer irreversibly transfers quant to system contract and only
-    *  the receiver may reclaim the tokens via the sellram action. The receiver pays for the
-    *  storage of all database records associated with this action.
-    *
-    *  RAM is a scarce resource whose supply is defined by global properties max_ram_size. RAM is
-    *  priced using the bancor algorithm such that price-per-byte with a constant reserve ratio of 100:1.
+    *  When buying ram the payer transfers quant to ra.ram (net of fee) and only
+    *  the receiver may reclaim those tokens via sellram at average cost basis.
+    *  RAM is priced at a governance-set fixed rate; rammarket.base is the free-byte ledger.
     */
    action_return_buyram system_contract::buyram( const name& payer, const name& receiver, const asset& quant )
    {
@@ -56,15 +130,24 @@ namespace rasystem {
       check( quant.symbol == core_symbol(), "must buy ram with core token" );
       check( quant.amount > 0, "must purchase a positive amount" );
 
+      const auto cfg = ram_config();
+      check( cfg.ram_price_per_byte.amount > 0, "ram price must be positive" );
+      check( cfg.ram_fee_percent < ram_fee_precision, "invalid ram fee percent" );
+
       asset fee = quant;
-      fee.amount = ( fee.amount + 199 ) / 200; /// .5% fee (round up)
-      // fee.amount cannot be 0 since that is only possible if quant.amount is 0 which is not allowed by the assert above.
-      // If quant.amount == 1, then fee.amount == 1,
-      // otherwise if quant.amount > 1, then 0 < fee.amount < quant.amount.
+      fee.amount = static_cast<int64_t>( ( int128_t( quant.amount ) * cfg.ram_fee_percent + ram_fee_precision - 1 ) / ram_fee_precision );
+      check( fee.amount < quant.amount, "ram fee consumes the entire payment" );
+
       asset quant_after_fee = quant;
       quant_after_fee.amount -= fee.amount;
-      // quant_after_fee.amount should be > 0 if quant.amount > 1.
-      // If quant.amount == 1, then quant_after_fee.amount == 0 and the next inline transfer will fail causing the buyram action to fail.
+
+      const int64_t bytes_out = static_cast<int64_t>( int128_t( quant_after_fee.amount ) / cfg.ram_price_per_byte.amount );
+      check( bytes_out > 0, "must reserve a positive amount" );
+
+      const auto& market = _rammarket.get( ramcore_symbol.raw(), "ram market does not exist" );
+      check( market.base.balance.amount >= bytes_out, "insufficient available ram" );
+      assert_under_ram_cap( receiver, bytes_out, cfg );
+
       {
          token::transfer_action transfer_act{ token_account, { {payer, active_permission}, {ram_account, active_permission} } };
          transfer_act.send( payer, ram_account, quant_after_fee, "buy ram" );
@@ -75,28 +158,22 @@ namespace rasystem {
          channel_to_system_fees( ramfee_account, fee );
       }
 
-      int64_t bytes_out;
-
-      const auto& market = _rammarket.get(ramcore_symbol.raw(), "ram market does not exist");
       _rammarket.modify( market, same_payer, [&]( auto& es ) {
-         bytes_out = es.direct_convert( quant_after_fee,  ram_symbol ).amount;
+         es.base.balance.amount -= bytes_out;
       });
-
-      check( bytes_out > 0, "must reserve a positive amount" );
 
       _gstate.total_ram_bytes_reserved += uint64_t(bytes_out);
       _gstate.total_ram_stake          += quant_after_fee.amount;
 
+      credit_purchased_ram( receiver, bytes_out, quant_after_fee );
       const int64_t ram_bytes = add_ram( receiver, bytes_out );
 
-      // logging
       system_contract::logbuyram_action logbuyram_act{ get_self(), { {get_self(), active_permission} } };
       system_contract::logsystemfee_action logsystemfee_act{ get_self(), { {get_self(), active_permission} } };
 
       logbuyram_act.send( payer, receiver, quant, bytes_out, ram_bytes, fee );
       logsystemfee_act.send( ram_account, fee, "buy ram" );
 
-      // action return value
       return action_return_buyram{ payer, receiver, quant, bytes_out, ram_bytes, fee };
    }
 
@@ -107,53 +184,41 @@ namespace rasystem {
    }
 
   /**
-    *  The system contract now buys and sells RAM allocations at prevailing market prices.
-    *  This may result in traders buying RAM today in anticipation of potential shortages
-    *  tomorrow. Overall this will result in the market balancing the supply and demand
-    *  for RAM over time.
+    *  Sell purchased RAM at the seller's average cost basis. Tokens return from ra.ram;
+    *  the free-byte ledger is credited so the same bytes can be bought again.
     */
    action_return_sellram system_contract::sellram( const name& account, int64_t bytes ) {
       require_auth( account );
       update_ram_supply();
       require_recipient(account);
+      check( bytes > 0, "must sell a positive amount" );
+
+      const asset tokens_out = debit_purchased_ram( account, bytes );
+      check( tokens_out.amount > 0, "token amount received from selling ram is too low" );
+
       const int64_t ram_bytes = reduce_ram(account, bytes);
 
-      asset tokens_out;
       auto itr = _rammarket.find(ramcore_symbol.raw());
+      check( itr != _rammarket.end(), "ram market does not exist" );
       _rammarket.modify( itr, same_payer, [&]( auto& es ) {
-         /// the cast to int64_t of bytes is safe because we certify bytes is <= quota which is limited by prior purchases
-         tokens_out = es.direct_convert( asset(bytes, ram_symbol), core_symbol());
+         es.base.balance.amount += bytes;
       });
 
-      check( tokens_out.amount > 1, "token amount received from selling ram is too low" );
-
-      _gstate.total_ram_bytes_reserved -= static_cast<decltype(_gstate.total_ram_bytes_reserved)>(bytes); // bytes > 0 is asserted above
+      _gstate.total_ram_bytes_reserved -= static_cast<decltype(_gstate.total_ram_bytes_reserved)>(bytes);
       _gstate.total_ram_stake          -= tokens_out.amount;
-
-      //// this shouldn't happen, but just in case it does we should prevent it
       check( _gstate.total_ram_stake >= 0, "error, attempt to unstake more tokens than previously staked" );
 
       {
          token::transfer_action transfer_act{ token_account, { {ram_account, active_permission}, {account, active_permission} } };
-         transfer_act.send( ram_account, account, asset(tokens_out), "sell ram" );
-      }
-      const int64_t fee = ( tokens_out.amount + 199 ) / 200; /// .5% fee (round up)
-      // since tokens_out.amount was asserted to be at least 2 earlier, fee.amount < tokens_out.amount
-      if ( fee > 0 ) {
-         token::transfer_action transfer_act{ token_account, { {account, active_permission} } };
-         transfer_act.send( account, ramfee_account, asset(fee, core_symbol()), "sell ram fee" );
-         channel_to_system_fees( ramfee_account, asset(fee, core_symbol() ));
+         transfer_act.send( ram_account, account, tokens_out, "sell ram" );
       }
 
-      // logging
+      const asset fee{ 0, core_symbol() };
+
       system_contract::logsellram_action logsellram_act{ get_self(), { {get_self(), active_permission} } };
-      system_contract::logsystemfee_action logsystemfee_act{ get_self(), { {get_self(), active_permission} } };
+      logsellram_act.send( account, tokens_out, bytes, ram_bytes, fee );
 
-      logsellram_act.send( account, tokens_out, bytes, ram_bytes, asset(fee, core_symbol() ) );
-      logsystemfee_act.send( ram_account, asset(fee, core_symbol() ), "sell ram" );
-
-      // action return value
-      return action_return_sellram{ account, tokens_out, bytes, ram_bytes, asset(fee, core_symbol() ) };
+      return action_return_sellram{ account, tokens_out, bytes, ram_bytes, fee };
    }
 
    void system_contract::logsellram( const name& account, const asset& quantity, int64_t bytes, int64_t ram_bytes, const asset& fee ) {
@@ -168,12 +233,24 @@ namespace rasystem {
       require_auth( from );
       update_ram_supply();
       check( memo.size() <= 256, "memo has more than 256 bytes" );
+      check( bytes > 0, "must transfer a positive amount" );
+      if ( to != null_account ) {
+         assert_under_ram_cap( to, bytes, ram_config() );
+      }
+      transfer_purchased_ram( from, to, bytes );
       const int64_t from_ram_bytes = reduce_ram( from, bytes );
-      const int64_t to_ram_bytes = add_ram( to, bytes );
+      const int64_t to_ram_bytes = ( to == null_account ) ? 0 : add_ram( to, bytes );
+      if ( to == null_account ) {
+         auto itr = _rammarket.find( ramcore_symbol.raw() );
+         check( itr != _rammarket.end(), "ram market does not exist" );
+         _rammarket.modify( itr, same_payer, [&]( auto& es ) {
+            es.base.balance.amount += bytes;
+         });
+         _gstate.total_ram_bytes_reserved -= static_cast<uint64_t>( bytes );
+      }
       require_recipient( from );
       require_recipient( to );
 
-      // action return value
       return action_return_ramtransfer{ from, to, bytes, from_ram_bytes, to_ram_bytes };
    }
 
@@ -204,6 +281,49 @@ namespace rasystem {
    {
       require_auth( get_self() );
       require_recipient( owner );
+   }
+
+   void system_contract::setramoption( const std::optional<asset>& ram_price_per_byte,
+                                      const std::optional<uint64_t>& max_per_user_bytes,
+                                      const std::optional<uint16_t>& ram_fee_percent )
+   {
+      require_auth( get_self() );
+      auto cfg = ram_config();
+      if ( ram_price_per_byte ) {
+         check( ram_price_per_byte->symbol == core_symbol(), "ram price must be core token" );
+         check( ram_price_per_byte->amount > 0, "ram price must be positive" );
+         cfg.ram_price_per_byte = *ram_price_per_byte;
+      }
+      if ( max_per_user_bytes ) {
+         check( *max_per_user_bytes > 0, "max per user bytes must be positive" );
+         cfg.max_per_user_bytes = *max_per_user_bytes;
+      }
+      if ( ram_fee_percent ) {
+         check( *ram_fee_percent < ram_fee_precision, "ram fee percent must be less than 10000" );
+         cfg.ram_fee_percent = *ram_fee_percent;
+      }
+      _globalram.set( cfg, get_self() );
+   }
+
+   void system_contract::ramlimitset( const name& account, int64_t ramlimit )
+   {
+      require_auth( get_self() );
+      check( is_account( account ), "account does not exist" );
+      check( ramlimit >= 0, "ram limit must be non-negative" );
+
+      auto itr = _usersram.find( account.value );
+      if ( itr == _usersram.end() ) {
+         _usersram.emplace( get_self(), [&]( auto& row ) {
+            row.owner     = account;
+            row.ram_bytes = 0;
+            row.quantity  = asset{ 0, core_symbol() };
+            row.ramlimit  = ramlimit;
+         });
+      } else {
+         _usersram.modify( itr, same_payer, [&]( auto& row ) {
+            row.ramlimit = ramlimit;
+         });
+      }
    }
 
    int64_t system_contract::reduce_ram( const name& owner, int64_t bytes ) {

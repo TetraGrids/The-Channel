@@ -14,7 +14,7 @@ namespace eosio {
 
    using std::string;
    /**
-    * The ra.fees smart contract facilitates the collection of transaction fees from system accounts and their subsequent distribution to the Resource Exchange (REX) pool.
+    * The ra.fees smart contract collects system fees (RAM, namebid, powerup). REX is disabled, so incoming transfers are held here rather than donated to a REX pool.
     *
     * This contract serves as an essential component for inclusion in system-level unit tests.
     *

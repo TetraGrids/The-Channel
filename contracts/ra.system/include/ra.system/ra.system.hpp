@@ -2,6 +2,7 @@
 
 #include <eosio/asset.hpp>
 #include <eosio/binary_extension.hpp>
+#include <eosio/crypto.hpp>
 #include <eosio/privileged.hpp>
 #include <eosio/producer_schedule.hpp>
 #include <eosio/singleton.hpp>
@@ -21,10 +22,8 @@
 #ifdef CHANNEL_RAM_AND_NAMEBID_FEES_TO_REX
 #undef CHANNEL_RAM_AND_NAMEBID_FEES_TO_REX
 #endif
-// CHANNEL_RAM_AND_NAMEBID_FEES_TO_REX macro determines whether ramfee and namebid proceeds are
-// channeled to REX pool. In order to stop these proceeds from being channeled, the macro must
-// be set to 0.
-#define CHANNEL_RAM_AND_NAMEBID_FEES_TO_REX 1
+// REX is disabled. RAM and namebid fees go to ra.fees, never to a REX pool.
+#define CHANNEL_RAM_AND_NAMEBID_FEES_TO_REX 0
 
 namespace rasystem {
 
@@ -73,7 +72,11 @@ namespace rasystem {
    static constexpr uint32_t blocks_per_day        = 2 * seconds_per_day; // half seconds per day
 
    static constexpr int64_t  min_activated_stake   = 150'000'000'0000;
-   static constexpr int64_t  ram_gift_bytes        = 1400;
+   static constexpr int64_t  ram_gift_bytes        = 6000; // Tonomy-style starter RAM for new accounts
+   static constexpr int64_t  ram_fee_precision     = 10000; // 10000 = 100%
+   static constexpr int64_t  default_ram_fee_pct   = 1000;  // 10%
+   static constexpr int64_t  default_ram_price_amt = 1;     // 0.0001 RA / byte at precision 4
+   static constexpr uint64_t default_ram_user_cap  = 8ull * 1024 * 1024; // 8 MiB
    static constexpr int64_t  min_pervote_daily_pay = 100'0000;
    static constexpr uint32_t refund_delay_sec      = 3 * seconds_per_day;
 
@@ -103,10 +106,9 @@ namespace rasystem {
    * - Users can stake tokens for CPU and Network bandwidth, and then vote for producers or
    *    delegate their vote to a proxy.
    * - Producers register in order to be voted for, and can claim per-block and per-vote rewards.
-   * - Users can buy and sell RAM at a market-determined price.
+   * - Users can buy and sell RAM at a governance-set fixed price (XPR-style).
    * - Users can bid on premium names.
-   * - A resource exchange system (REX) allows token holders to lend their tokens,
-   *    and users to rent CPU and Network resources in return for a market-determined fee.
+   * - CPU/NET rental is provided by ra.resources and powerup. REX is disabled.
    */
 
    // A name bid, which consists of:
@@ -198,6 +200,48 @@ namespace rasystem {
 
       EOSLIB_SERIALIZE( eosio_global_state4, (continuous_rate)(inflation_pay_factor)(votepay_factor) )
    };
+
+   /**
+    * Fixed-price RAM configuration. `rammarket` remains the free-byte ledger;
+    * this singleton is the price, fee, and per-account cap.
+    */
+   struct [[eosio::table("globalram"), eosio::contract("ra.system")]] eosio_global_stateram {
+      asset    ram_price_per_byte = asset{ default_ram_price_amt, symbol(symbol_code("RA"), 4) };
+      uint64_t max_per_user_bytes = default_ram_user_cap;
+      uint16_t ram_fee_percent    = default_ram_fee_pct;
+   };
+
+   typedef eosio::singleton< "globalram"_n, eosio_global_stateram > global_state_ram_singleton;
+
+   /**
+    * Per-account purchased RAM and cost basis. Sell refunds at average cost so
+    * ra.ram stays solvent at a fixed price.
+    */
+   struct [[eosio::table, eosio::contract("ra.system")]] user_resourcesram {
+      name     owner;
+      int64_t  ram_bytes = 0;
+      asset    quantity  = asset{ 0, symbol(symbol_code("RA"), 4) };
+      int64_t  ramlimit  = 0; // 0 = use global max_per_user_bytes
+
+      uint64_t primary_key() const { return owner.value; }
+   };
+
+   typedef eosio::multi_index< "usersram"_n, user_resourcesram > user_resourcesram_table;
+
+   /**
+    * Registered application. loginwithapp creates a permission on the user
+    * named after this app account (Tonomy-style per-app keys).
+    */
+   struct [[eosio::table, eosio::contract("ra.system")]] app_info {
+      name        account;
+      name        admin;
+      std::string description;
+      bool        enabled = true;
+
+      uint64_t primary_key() const { return account.value; }
+   };
+
+   typedef eosio::multi_index< "apps"_n, app_info > apps_table;
 
    // Defines the schedule for pre-determined annual rate changes.
    struct [[eosio::table, eosio::contract("ra.system")]] schedules_info {
@@ -797,9 +841,8 @@ namespace rasystem {
     * - Producers register in order to be voted for, and can claim per-block and per-vote rewards.
     * - Users can buy and sell RAM at a market-determined price.
     * - Users can bid on premium names.
-    * - A resource exchange system (REX) allows token holders to lend their tokens,
-    *    and users to rent CPU and Network resources in return for a market-determined fee.
-    * - A resource market separate from REX: `power`.
+    * - CPU/NET rental via ra.resources (subscription) and powerup. REX is disabled.
+    * - A resource market separate from staking: `power`.
     */
    class [[eosio::contract("ra.system")]] system_contract : public native {
 
@@ -821,7 +864,10 @@ namespace rasystem {
          eosio_global_state3      _gstate3;
          eosio_global_state4      _gstate4;
          schedules_table          _schedules;
-         rammarket                _rammarket;
+         rammarket                    _rammarket;
+         global_state_ram_singleton   _globalram;
+         user_resourcesram_table      _usersram;
+         apps_table                   _apps;
          rex_pool_table           _rexpool;
          rex_return_pool_table    _rexretpool;
          rex_return_buckets_table _rexretbuckets;
@@ -842,8 +888,8 @@ namespace rasystem {
          static constexpr eosio::name saving_account{"ra.saving"_n};
          static constexpr eosio::name rex_account{"ra.rex"_n};
          static constexpr eosio::name fees_account{"ra.fees"_n};
-         static constexpr eosio::name powerup_account{"eosio.powup"_n};
-         static constexpr eosio::name reserve_account{"eosio.reserv"_n}; // cspell:disable-line
+         static constexpr eosio::name powerup_account{"ra.powup"_n};
+         static constexpr eosio::name reserve_account{"ra.reserv"_n}; // cspell:disable-line
          static constexpr eosio::name null_account{"ra.null"_n};
          static constexpr symbol ramcore_symbol = symbol(symbol_code("RAMCORE"), 4);
          static constexpr symbol ram_symbol     = symbol(symbol_code("RAM"), 0);
@@ -1262,9 +1308,8 @@ namespace rasystem {
                             const asset& unstake_net_quantity, const asset& unstake_cpu_quantity );
 
          /**
-          * Buy ram action, increases receiver's ram quota based upon current price and quantity of
-          * tokens provided. An inline transfer from receiver to system contract of
-          * tokens will be executed.
+          * Buy ram action, increases receiver's ram quota at the governance-set fixed
+          * price. An inline transfer from payer to ra.ram of tokens will be executed.
           *
           * @param payer - the ram buyer,
           * @param receiver - the ram receiver,
@@ -1371,6 +1416,46 @@ namespace rasystem {
           */
          [[eosio::action]]
          void logramchange( const name& owner, int64_t bytes, int64_t ram_bytes );
+
+         /**
+          * Set the fixed RAM price, per-user cap, and fee percent. Only ra may call this.
+          * Omitted optionals leave the current value unchanged.
+          */
+         [[eosio::action]]
+         void setramoption( const std::optional<asset>& ram_price_per_byte,
+                            const std::optional<uint64_t>& max_per_user_bytes,
+                            const std::optional<uint16_t>& ram_fee_percent );
+
+         /**
+          * Override the per-account purchased-RAM cap. 0 restores the global cap.
+          */
+         [[eosio::action]]
+         void ramlimitset( const name& account, int64_t ramlimit );
+
+         /**
+          * Register an application account so users can create a per-app permission.
+          */
+         [[eosio::action]]
+         void newapp( const name& account, const name& admin, const std::string& description );
+
+         /**
+          * Privileged create/update of an application row.
+          */
+         [[eosio::action]]
+         void adminsetapp( const name& account, const name& admin, const std::string& description, bool enabled );
+
+         /**
+          * Remove an application registration.
+          */
+         [[eosio::action]]
+         void deleteapp( const name& account );
+
+         /**
+          * Create or replace a permission on `user` named `app`, parented at `parent`,
+          * with a single key. This is the Tonomy loginwithapp pattern.
+          */
+         [[eosio::action]]
+         void loginwithapp( const name& user, const name& app, const name& parent, const eosio::public_key& key );
 
          /**
           * Refund action, this action is called after the delegation-period to claim all pending
@@ -1794,6 +1879,12 @@ namespace rasystem {
          using ramburn_action = eosio::action_wrapper<"ramburn"_n, &system_contract::ramburn>;
          using buyramburn_action = eosio::action_wrapper<"buyramburn"_n, &system_contract::buyramburn>;
          using logramchange_action = eosio::action_wrapper<"logramchange"_n, &system_contract::logramchange>;
+         using setramoption_action = eosio::action_wrapper<"setramoption"_n, &system_contract::setramoption>;
+         using ramlimitset_action = eosio::action_wrapper<"ramlimitset"_n, &system_contract::ramlimitset>;
+         using newapp_action = eosio::action_wrapper<"newapp"_n, &system_contract::newapp>;
+         using adminsetapp_action = eosio::action_wrapper<"adminsetapp"_n, &system_contract::adminsetapp>;
+         using deleteapp_action = eosio::action_wrapper<"deleteapp"_n, &system_contract::deleteapp>;
+         using loginwithapp_action = eosio::action_wrapper<"loginwithapp"_n, &system_contract::loginwithapp>;
          using refund_action = eosio::action_wrapper<"refund"_n, &system_contract::refund>;
          using regproducer_action = eosio::action_wrapper<"regproducer"_n, &system_contract::regproducer>;
          using regproducer2_action = eosio::action_wrapper<"regproducer2"_n, &system_contract::regproducer2>;
@@ -1831,6 +1922,7 @@ namespace rasystem {
          bool execute_next_schedule();
 
          // defined in rex.cpp
+         void assert_rex_disabled() const;
          void runrex( uint16_t max );
          void update_rex_pool();
          void update_resource_limits( const name& from, const name& receiver, int64_t delta_net, int64_t delta_cpu );
@@ -1873,6 +1965,12 @@ namespace rasystem {
          int64_t add_ram( const name& owner, int64_t bytes );
          void update_stake_delegated( const name from, const name receiver, const asset stake_net_delta, const asset stake_cpu_delta );
          void update_user_resources( const name from, const name receiver, const asset stake_net_delta, const asset stake_cpu_delta );
+         eosio_global_stateram ram_config() const;
+         void credit_purchased_ram( const name& owner, int64_t bytes, const asset& cost );
+         asset debit_purchased_ram( const name& owner, int64_t bytes );
+         void transfer_purchased_ram( const name& from, const name& to, int64_t bytes );
+         int64_t purchased_ram_cap( const name& owner, const eosio_global_stateram& cfg ) const;
+         void assert_under_ram_cap( const name& owner, int64_t additional_bytes, const eosio_global_stateram& cfg ) const;
 
          // defined in voting.cpp
          void register_producer( const name& producer, const eosio::block_signing_authority& producer_authority, const std::string& url, uint16_t location );

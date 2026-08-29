@@ -6,10 +6,10 @@ The human-first blockchain, built on p2p trust, mining attention, and Pure Liqui
 
 The Channel is everything Spring 2.0 was meant to be, plus:
 
-- **Signing for many types** — transaction signing beyond K1/R1, ported from the [Wire blockchain](https://github.com/Wire-Network), including the ability to transfer funds on another chain and unlock them on The Channel.
-- **A human-first resource model** — a hybrid of the [Tonomy](https://github.com/Tonomy-Foundation) paradigm (whitelisted contracts pay for their users' transaction costs **by default, including RAM**) and select resource ideas from Wire. Block producers set their own policies — block producers are the ones producing blocks.
-- **The RAM market from [XPR Network](https://github.com/ProtonProtocol)** — renting of resources and fixed, governance-set pricing of RAM.
-- **Dangling Spring features** — valuable unmerged work from across the AntelopeIO repos, merged into one coherent base.
+- **Signing for many types** — K1, R1, WebAuthn, plus Wire **EM** (EIP-191) and **ED** (ed25519). Link an external key with `ra.authex` and unlock a deposit through `ra.claim`.
+- **A human-first resource model** — Tonomy-style app registry and `loginwithapp` (per-app `user@app` keys). Contracts pay user-row RAM with `payer=get_self()`. Users pay CPU/NET, or rent via `ra.resources` / powerup. Block producers produce blocks.
+- **The RAM market from [XPR Network](https://github.com/ProtonProtocol)** — fixed, governance-set RAM price (`setramoption`) and subscription CPU/NET rental. REX is disabled.
+- **Dangling Spring features** — strong-QC mid-production apply and paginated `get_accounts_by_authorizers` are already in this tree. Larger unmerged Spring work (chaindb slab allocator, xxhash wrapper) is cataloged and not merged yet.
 
 1. [Branches](#branches)
 2. [System Token](#system-token)
@@ -23,7 +23,7 @@ The Channel is everything Spring 2.0 was meant to be, plus:
 The `main` branch is the development branch; do not use it for production. Refer to the [release page](https://github.com/TetraGrids/The-Channel/releases) for current information on releases, pre-releases, and obsolete releases, as well as the corresponding tags for those releases.
 
 ## System Token
-The default system token is **RA** (4 decimals), the equivalent of EOS on EOS, WAX on WAX, or TONO on Tonomy. RAM is addressed through the RAM token and the RAM market (fixed, governance-set pricing with resource renting). The core symbol can be changed at build time with `-DCORE_SYMBOL_NAME`.
+The default system token is **RA** (4 decimals), the equivalent of EOS on EOS, WAX on WAX, or TONO on Tonomy. RAM is sold at a governance-set fixed price (default `0.0001 RA` per byte, 10% fee, 8 MiB per-account cap; change with `setramoption`). Anyone may buy RAM; apps are expected to pay user-row RAM. The core symbol can be changed at build time with `-DCORE_SYMBOL_NAME`.
 
 ## Core Contracts
 All core contracts ship in this repository under [`contracts/`](./contracts), renamed to the `ra.*` namespace:
@@ -32,11 +32,25 @@ All core contracts ship in this repository under [`contracts/`](./contracts), re
 |---|---|
 | `ra.bios` | Chain bootstrapping |
 | `ra.boot` | Post-boot activation sequencing |
-| `ra.system` | Staking, voting, producers, RAM market, resource renting |
+| `ra.system` | Staking, voting, producers, fixed-price RAM, app registry / `loginwithapp`, powerup |
 | `ra.token` | Standard token (RA lives here) |
 | `ra.msig` | Multisignature proposals |
 | `ra.wrap` | Governance transaction wrapper |
 | `ra.bpay` / `ra.fees` | Block pay and fee routing |
+| `ra.resources` | Subscription CPU/NET rental (XPR-style; REX is off) |
+| `ra.authex` | External-key linking for cross-chain identity |
+| `ra.claim` | Relayer-credited deposit / user claim unlock |
+
+After `ra.boot` is on `ra`, activate these Spring 2.0 features before deploying `ra.system` (these digests are Spring's, not Leap 4's):
+
+| Feature | Digest |
+|---|---|
+| `RAM_RESTRICTIONS` | `1812fdb5096fd854a4958eb9d53b43219d114de0e858ce00255bd46569ad2c68` |
+| `ONLY_BILL_FIRST_AUTHORIZER` | `2f1f13e291c79da5a2bbad259ed7c1f2d34f697ea460b14b565ac33b063b73e2` |
+| `WEBAUTHN_KEY` | `927fdf78c51e77a899f2db938249fb1f8bb38f4e43d9c1f75b190492080cbc34` |
+| `EM_ED_KEYS` | `dfc2e8e511691cb1e4c3e0792c48e2e882f74117e08b68b48f987903416bdd86` |
+
+`RAM_RESTRICTIONS` is what makes `payer=get_self()` safe. `EM_ED_KEYS` raises supported key types to 5 so EM/ED work in authorities and in `recover_key`. Do **not** activate `FORWARD_SETCODE` if `ra` should keep intercepting `setcode`.
 
 ## Supported Operating Systems
 We currently support the following operating systems.

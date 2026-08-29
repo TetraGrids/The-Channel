@@ -53,5 +53,8 @@ add_subdirectory(ra.token)
 add_subdirectory(ra.wrap)
 add_subdirectory(ra.fees)
 add_subdirectory(ra.bpay)
+add_subdirectory(ra.resources)
+add_subdirectory(ra.authex)
+add_subdirectory(ra.claim)
 
 add_subdirectory(test_contracts)
