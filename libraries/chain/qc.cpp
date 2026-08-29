@@ -442,7 +442,7 @@ aggregate_vote_result_t aggregating_qc_t::aggregate_vote(uint32_t connection_id,
 
    auto add_vote = [&](finalizer_authority_ptr& auth, const finalizer_policy_ptr& finalizer_policy, aggregating_qc_sig_t& agg_qc_sig) -> vote_result_t {
       const auto& finalizers = finalizer_policy->finalizers;
-      auto itr = std::ranges::find_if(finalizers, [&](const auto& finalizer) { return finalizer.public_key == vote.finalizer_key; });
+      auto itr = std::find_if(finalizers.begin(), finalizers.end(), [&](const auto& finalizer) { return finalizer.public_key == vote.finalizer_key; });
       vote_result_t s = vote_result_t::unknown_public_key;
       if (itr != finalizers.end()) {
          auth = finalizer_authority_ptr{finalizer_policy, &(*itr)}; // use aliasing shared_ptr constructor
@@ -487,7 +487,7 @@ vote_status_t aggregating_qc_t::has_voted(const bls_public_key& key) const {
                                  const aggregating_qc_sig_t& agg_qc_sig,
                                  const bls_public_key& key) -> vote_status_t {
       const auto& finalizers = policy->finalizers;
-      auto it = std::ranges::find_if(finalizers, [&](const auto& finalizer) { return finalizer.public_key == key; });
+      auto it = std::find_if(finalizers.begin(), finalizers.end(), [&](const auto& finalizer) { return finalizer.public_key == key; });
       if (it != finalizers.end()) {
          auto index = std::distance(finalizers.begin(), it);
          return agg_qc_sig.has_voted(index) ? vote_status_t::voted : vote_status_t::not_voted;

@@ -123,7 +123,7 @@ namespace eosio::chain {
          votes.reserve(finalizers.size());
 
          auto in_policy = [](finalizer_authority_ptr& auth, const finalizer_policy_ptr& finalizer_policy, const bls_public_key& key) {
-            return std::ranges::any_of(finalizer_policy->finalizers, [&](const finalizer_authority& fin_auth) {
+            return std::any_of(finalizer_policy->finalizers.begin(), finalizer_policy->finalizers.end(), [&](const finalizer_authority& fin_auth) {
                if (fin_auth.public_key == key) {
                   auth = finalizer_authority_ptr{finalizer_policy, &fin_auth}; // use aliasing shared_ptr constructor
                   return true;
@@ -170,12 +170,12 @@ namespace eosio::chain {
 
       template<typename F>
       bool all_of_public_keys(F&& f) const { // only access keys which do not change, thread safe
-         return std::ranges::all_of(std::views::keys(finalizers), std::forward<F>(f));
+         return std::all_of(finalizers.begin(), finalizers.end(), [&](const auto& kv) { return f(kv.first); });
       }
 
       template<typename F>
       bool any_of_public_keys(F&& f) const { // only access keys which do not change, thread safe
-         return std::ranges::any_of(std::views::keys(finalizers), std::forward<F>(f));
+         return std::any_of(finalizers.begin(), finalizers.end(), [&](const auto& kv) { return f(kv.first); });
       }
 
       void    set_default_safety_information(const fsi_t& fsi);

@@ -268,7 +268,7 @@ void evaluate_finalizer_policies_for_promotion(const block_header_state& prev,
 
    // Find the target proposed policy which is the proposed policy with the greatest
    // associated block number that is less than or equal to the new LIB number
-   auto first_reversible = std::ranges::find_if(prev_proposed, [&](const auto& p) { return p.first > lib; });
+   auto first_reversible = std::find_if(prev_proposed.begin(), prev_proposed.end(), [&](const auto& p) { return p.first > lib; });
    auto target = first_reversible > prev_proposed.begin() ? first_reversible - 1 : prev_proposed.end();
 
    // Promote target policy to pending if the pending slot is available, otherwise

@@ -9,6 +9,7 @@
 #include <fc/crypto/k1_recover.hpp>
 #include <bn256/bn256.h>
 #include <bls12-381/bls12-381.hpp>
+#include <openssl/blake2.h>
 
 // local helpers
 namespace {
@@ -45,6 +46,8 @@ namespace eosio::chain::webassembly {
         "Unactivated signature type used during assert_recover_key");
       EOS_ASSERT(p.which() < context.db.get<protocol_state_object>().num_supported_key_types, unactivated_key_type,
         "Unactivated key type used when creating assert_recover_key");
+      EOS_ASSERT(p.which() == s.which(), crypto_api_exception,
+        "Public key type does not match signature type");
 
       if(context.control.is_speculative_block())
          EOS_ASSERT(s.variable_size() <= context.control.configured_subjective_signature_length_limit(),
@@ -274,6 +277,16 @@ namespace eosio::chain::webassembly {
          return return_code::failure;
 
       std::memcpy( pub.data(), res.data(), res.size() );
+      return return_code::success;
+   }
+
+   int32_t interface::blake2b_256( span<const char> data, span<char> result ) const {
+      if( result.size() != BLAKE2B256_DIGEST_LENGTH )
+         return return_code::failure;
+
+      auto in_bytes  = reinterpret_cast<const uint8_t*>(data.data());
+      auto out_bytes = reinterpret_cast<uint8_t*>(result.data());
+      BLAKE2B256( in_bytes, data.size(), out_bytes );
       return return_code::success;
    }
 

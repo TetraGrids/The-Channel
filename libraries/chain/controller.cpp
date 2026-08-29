@@ -4979,7 +4979,7 @@ struct controller_impl {
          assert(replaying);
          legacy_root = transition_legacy_branch[0];
          legacy_branch = {transition_legacy_branch.begin()+1, transition_legacy_branch.end()};
-         std::ranges::reverse(legacy_branch);
+         std::reverse(legacy_branch.begin(), legacy_branch.end());
       } else {
          fork_db_.apply_l<void>([&](const auto& fork_db) {
             legacy_root = fork_db.root();

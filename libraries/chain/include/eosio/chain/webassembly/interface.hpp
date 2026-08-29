@@ -1859,6 +1859,17 @@ namespace webassembly {
          int32_t k1_recover( span<const char> signature, span<const char> digest, span<char> pub) const;
 
          /**
+          * Hashes data using BLAKE2b-256.
+          *
+          * @ingroup crypto
+          * @param data - a span containing the data.
+          * @param[out] result - output buffer, must be exactly 32 bytes.
+          *
+          * @return -1 if there was an error, 0 otherwise.
+         */
+         int32_t blake2b_256( span<const char> data, span<char> result ) const;
+
+         /**
           * Host function for G1 addition on the elliptic curve bls12-381
           *
           * @ingroup crypto

@@ -1358,7 +1358,7 @@ namespace eosio::testing {
          auto [privkey, pubkey, pop] = get_bls_key( f.name );
 
          // if it is a local finalizer, set up public to private key mapping for voting
-         if( auto it = std::ranges::find_if(input.local_finalizers, [&](const auto& name) { return name == f.name; });
+         if( auto it = std::find_if(input.local_finalizers.begin(), input.local_finalizers.end(), [&](const auto& name) { return name == f.name; });
              it != input.local_finalizers.end()) {
             local_finalizer_keys[pubkey.to_string()] = privkey.to_string();
             res.privkeys.emplace_back(privkey);

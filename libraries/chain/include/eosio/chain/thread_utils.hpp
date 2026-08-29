@@ -13,6 +13,29 @@
 #include <optional>
 #include <thread>
 
+#if !defined(__cpp_lib_jthread)
+// minimal std::jthread stand-in for toolchains whose libc++ predates it (e.g. AppleClang 14):
+// supports only what this header uses -- move-only, emplace into a list, join-on-destruct.
+// No stop_token support.
+namespace std {
+   class jthread {
+      thread t_;
+   public:
+      jthread() = default;
+      template<typename F>
+         requires (!std::is_same_v<std::decay_t<F>, jthread>)
+      explicit jthread(F&& f) : t_(std::forward<F>(f)) {}
+      jthread(jthread&&) = default;
+      jthread& operator=(jthread&&) = default;
+      jthread(const jthread&) = delete;
+      jthread& operator=(const jthread&) = delete;
+      ~jthread() { if (t_.joinable()) t_.join(); }
+      bool joinable() const noexcept { return t_.joinable(); }
+      void join() { t_.join(); }
+   };
+}
+#endif
+
 namespace eosio { namespace chain {
 
    // Avoid GCC warning:

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <eosio/chain/types.hpp>
+#include <compare>
 #include <eosio/chain/finalizer_authority.hpp>
 #include <fc/container/ordered_diff.hpp>
 
@@ -51,7 +52,26 @@ namespace eosio::chain {
          return (sum - threshold);
       }
 
-      auto operator<=>(const finalizer_policy&) const = default;
+      // libc++ before 15 lacks std::vector's operator<=>, so spell the comparison out
+      // (lexicographical over generation, threshold, then finalizers)
+      std::strong_ordering operator<=>(const finalizer_policy& rhs) const {
+         if (auto c = generation <=> rhs.generation; c != 0) return c;
+         if (auto c = threshold <=> rhs.threshold; c != 0) return c;
+         if (finalizers.size() != rhs.finalizers.size())
+            return finalizers.size() < rhs.finalizers.size() ? std::strong_ordering::less : std::strong_ordering::greater;
+         for (size_t i = 0; i < finalizers.size(); ++i) {
+            const auto& a = finalizers[i];
+            const auto& b = rhs.finalizers[i];
+            if (int c = a.description.compare(b.description); c != 0)
+               return c < 0 ? std::strong_ordering::less : std::strong_ordering::greater;
+            if (auto c = a.weight <=> b.weight; c != 0) return c;
+            if (auto c = a.public_key <=> b.public_key; c != 0) return c;
+         }
+         return std::strong_ordering::equal;
+      }
+      bool operator==(const finalizer_policy& rhs) const {
+         return generation == rhs.generation && threshold == rhs.threshold && finalizers == rhs.finalizers;
+      }
    };
 
    // This is used by SHiP and Deepmind which require public keys in string format.

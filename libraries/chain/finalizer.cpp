@@ -150,7 +150,7 @@ vote_message_ptr finalizer::maybe_vote(const bls_public_key& pub_key,
 // ----------------------------------------------------------------------------------------
 inline bool has_voted_strong(const std::vector<finalizer_authority>& finalizers, const qc_sig_t& qc, const bls_public_key& key) {
    assert(qc.is_strong());
-   auto it = std::ranges::find_if(finalizers, [&](const auto& fin) { return fin.public_key == key; });
+   auto it = std::find_if(finalizers.begin(), finalizers.end(), [&](const auto& fin) { return fin.public_key == key; });
    if (it != finalizers.end()) {
       auto index = std::distance(finalizers.begin(), it);
       assert(qc.strong_votes);
