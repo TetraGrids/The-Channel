@@ -1,0 +1,6 @@
+if( EOSIO_COMPILE_TEST_CONTRACTS )
+   add_contract( ra.wrap ra.wrap ra.wrap.cpp )
+else()
+   configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/ra.wrap.wasm ${CMAKE_CURRENT_BINARY_DIR}/ra.wrap.wasm COPYONLY )
+   configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/ra.wrap.abi  ${CMAKE_CURRENT_BINARY_DIR}/ra.wrap.abi  COPYONLY )
+endif()

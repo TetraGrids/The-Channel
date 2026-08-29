@@ -1,0 +1,2 @@
+/usr/bin/ar qc libboost_charconv.a CMakeFiles/boost_charconv.dir/src/from_chars.cpp.o CMakeFiles/boost_charconv.dir/src/to_chars.cpp.o
+/usr/bin/ranlib libboost_charconv.a

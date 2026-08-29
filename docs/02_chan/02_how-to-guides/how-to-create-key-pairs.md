@@ -1,0 +1,67 @@
+## Overview
+
+This how-to guide provides instructions on how to create a keypair consisting of a public key and a private key for signing transactions in an Antelope blockchain.
+
+## Before you begin
+
+Make sure you meet the following requirements:
+* Install the currently supported version of `chan`
+[[info | Note]]
+| The chan tool is bundled with the Antelope software. [Installing Antelope](../../00_install/index.md) will also install the chan tool. 
+* Learn about asymmetric cryptography (public and private keypair) in the context of an Antelope blockchain.
+
+## Command Reference
+
+See the following reference guide for `chan` command line usage and related options:
+* [`chan create key`](../03_command-reference/create/key.md) command and its parameters
+
+## Procedure
+
+The following steps show how to create a public/private keypair, display them on the console, and save them to a file:
+
+1. Create a public/private keypair and print them to the console:
+
+```sh
+chan create key --to-console
+```
+
+**Where**:
+
+* `--to-console` = The option parameter to print the keypair to the console
+
+**Example Output**
+
+```console
+Private key: 5KPzrqNMJdr6AX6abKg*******************************cH
+Public key: PUB_K1_4wSiQ2jbYGrqiiKCm8oWR88NYoqnmK4nNL1RCtSQeSFkD9wFug
+```
+
+2. Create a public/private keypair and save it to a file:
+
+```sh
+chan create key --file pw.txt
+```
+**Where**: 
+
+* `--file` = The option parameter to save the keypair to a file
+* `FILE_TO_SAVEKEY` = The name of the file to save the keypair
+
+**Example Output**
+
+```console
+saving keys to pw.txt
+```
+
+To view the saved keypair stored in the file:
+
+```sh
+cat pw.txt
+```
+```console
+Private key: 5K7************************************************
+Public key: PUB_K1_71k3WdpLDeqeyqVRAAxwpz6TqXwDo9Brik5dQhdvvpeTJVeU1k
+```
+
+## Summary
+
+By following these instructions, you are able to create public/private keypairs, print them to the console, and save them to a file. 

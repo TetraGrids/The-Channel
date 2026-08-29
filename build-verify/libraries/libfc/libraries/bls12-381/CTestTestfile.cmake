@@ -1,0 +1,8 @@
+# CMake generated Testfile for 
+# Source directory: /Users/fresh/Dropbox/htdocs/The-Channel/libraries/libfc/libraries/bls12-381
+# Build directory: /Users/fresh/Dropbox/htdocs/The-Channel/build-verify/libraries/libfc/libraries/bls12-381
+# 
+# This file includes the relevant testing commands required for 
+# testing this directory and lists subdirectories to be tested as well.
+subdirs("test")
+subdirs("bench")

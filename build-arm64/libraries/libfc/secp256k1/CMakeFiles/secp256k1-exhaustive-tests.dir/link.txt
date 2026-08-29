@@ -1,0 +1,1 @@
+/usr/bin/cc    -Wall -Wno-deprecated-declarations -O3 -DNDEBUG -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names "CMakeFiles/secp256k1-exhaustive-tests.dir/secp256k1/src/tests_exhaustive.c.o" -o secp256k1-exhaustive-tests  libsecp256k1.a

@@ -1,0 +1,1 @@
+/usr/bin/c++  -Wall -Wno-deprecated-declarations -Wthread-safety -O3 -DNDEBUG -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/chia_bench.dir/chia_bench.cpp.o -o chia_bench  ../libbls12-381.a

@@ -1,0 +1,207 @@
+#include <fc/crypto/elliptic_ed.hpp>
+
+#include <openssl/bn.h>
+#include <openssl/curve25519.h>
+
+#include <mutex>
+
+namespace fc { namespace crypto { namespace ed {
+
+   private_key_shim private_key_shim::generate() {
+      unsigned char pk[ed25519_public_key_bytes];
+      private_key_shim sk;
+      ED25519_keypair(pk, sk._data.data());
+      return sk;
+   }
+
+   // Derive public key from 64-byte secret key
+   public_key_shim private_key_shim::get_public_key() const {
+      public_key_shim pub;
+      // secret key layout is seed(32) || public_key(32)
+      memcpy(pub._data.data(), _data.data() + ed25519_public_key_bytes, ed25519_public_key_bytes);
+      return pub;
+   }
+
+   // Sign a 32‑byte digest (treat digest as the “message”)
+   signature_shim private_key_shim::sign_sha256(const sha256& digest) const {
+
+      // 2) Hex‑encode the 32‑byte digest as ASCII (lower‑case)
+      const std::string hex = fc::to_hex(digest.data(), digest.data_size());
+
+      // 3) Detached‑sign that ASCII hex payload
+      unsigned char sigbuf[ed25519_signature_bytes];
+      if (ED25519_sign(
+            sigbuf,
+            reinterpret_cast<const unsigned char*>(hex.data()),
+            hex.size(),
+            _data.data()
+         ) != 1)
+      {
+         FC_THROW_EXCEPTION(exception, "Failed to create ED25519 signature");
+      }
+
+      // 4) Pack into signature_shim: 32-byte pubkey + 64-byte sig
+      signature_shim out;
+      memset(out._data.data(), 0, out.size);
+      auto pub = get_public_key();
+      memcpy(out._data.data(), pub._data.data(), ed25519_public_key_bytes);
+      memcpy(out._data.data() + ed25519_public_key_bytes, sigbuf, ed25519_signature_bytes);
+      return out;
+   }
+
+   // Verify a 32‑byte digest signature
+   bool signature_shim::verify(const sha256& digest, const public_key_shim& pub) const {
+
+      // 1) Convert raw digest to ASCII hex, added due to Phantom wallet limitations which doesn't allow signing raw binary data. Guard rails so users don't unknowingly sign malicious transactions.
+      const std::string hex = fc::to_hex(digest.data(), digest.data_size());
+
+      // 2) Verify signature on hex payload (sig starts at offset 32)
+      return ED25519_verify(
+         reinterpret_cast<const unsigned char*>(hex.data()),
+         hex.size(),
+         _data.data() + ed25519_public_key_bytes,
+         pub._data.data()
+      ) == 1;
+   }
+
+   // Sign raw bytes directly (for Solana transaction signing)
+   signature_shim private_key_shim::sign_raw(const unsigned char* data, size_t len) const {
+
+      unsigned char sigbuf[ed25519_signature_bytes];
+      if (ED25519_sign(
+            sigbuf,
+            data,
+            len,
+            _data.data()
+         ) != 1)
+      {
+         FC_THROW_EXCEPTION(exception, "Failed to create ED25519 signature");
+      }
+
+      // Pack: 32-byte pubkey + 64-byte sig
+      signature_shim out;
+      memset(out._data.data(), 0, out.size);
+      auto pub = get_public_key();
+      memcpy(out._data.data(), pub._data.data(), ed25519_public_key_bytes);
+      memcpy(out._data.data() + ed25519_public_key_bytes, sigbuf, ed25519_signature_bytes);
+      return out;
+   }
+
+   // Recover public key from embedded bytes, verifying signature first
+   public_key_shim signature_shim::recover(const sha256& digest) const {
+      // Extract the embedded public key from [0..31]
+      public_key_shim pub;
+      memcpy(pub._data.data(), _data.data(), ed25519_public_key_bytes);
+
+      // Verify the signature against the embedded key
+      FC_ASSERT( verify(digest, pub), "ED25519 signature verification failed during recovery" );
+
+      return pub;
+   }
+
+   // Verify raw bytes directly (for Solana transaction verification)
+   bool signature_shim::verify_solana(const uint8_t* data, size_t len, const public_key_shim& pub) const {
+
+      // Sig starts at offset 32
+      return ED25519_verify(
+         data,
+         len,
+         _data.data() + ed25519_public_key_bytes,
+         pub._data.data()
+      ) == 1;
+   }
+
+   bool is_zero(const public_key_shim& pk) {
+      return std::all_of(pk._data.begin(), pk._data.end(), [](uint8_t b){ return b == 0; });
+   }
+
+   bool is_on_curve(const public_key_shim& pk) {
+      // Test whether the compressed Edwards point decompresses to a valid x² in
+      // F_p. Mirrors curve25519_dalek's CompressedEdwardsY::decompress validity
+      // check (pre subgroup filtering).
+      //
+      // Ed25519 curve: -x² + y² = 1 + d·x²·y²   with d = -121665/121666 mod p
+      // Compressed form: 32 LE bytes, top bit of byte[31] = sign(x).
+      //
+      // Procedure: clear sign bit, compute u = y²-1, v = d·y²+1,
+      // x² = u·v⁻¹ mod p, then test (x²)^((p-1)/2) ≢ -1 (Legendre).
+      std::array<uint8_t, 32> compressed = pk._data;
+      compressed[31] &= 0x7F;
+
+      BIGNUM* y         = BN_new();
+      BIGNUM* y_sq      = BN_new();
+      BIGNUM* u         = BN_new();
+      BIGNUM* v         = BN_new();
+      BIGNUM* p         = BN_new();
+      BIGNUM* d         = BN_new();
+      BIGNUM* x_sq      = BN_new();
+      BIGNUM* exp       = BN_new();
+      BIGNUM* legendre  = BN_new();
+      BIGNUM* one       = BN_new();
+      BIGNUM* neg_one   = BN_new();
+      BN_CTX* ctx       = BN_CTX_new();
+
+      // p = 2^255 - 19
+      BN_one(p);
+      BN_lshift(p, p, 255);
+      BN_sub_word(p, 19);
+
+      // OpenSSL BIGNUM is big-endian; ed25519 field elements are little-endian.
+      std::array<uint8_t, 32> y_be;
+      for (size_t i = 0; i < 32; ++i) {
+         y_be[i] = compressed[31 - i];
+      }
+      BN_bin2bn(y_be.data(), 32, y);
+
+      bool on_curve = false;
+      if (BN_cmp(y, p) < 0) {
+         BN_mod_sqr(y_sq, y, p, ctx);
+
+         BN_one(one);
+         BN_mod_sub(u, y_sq, one, p, ctx);
+
+         // d = -121665/121666 mod p, big-endian
+         static constexpr uint8_t d_be[] = {0x52, 0x03, 0x6c, 0xee, 0x2b, 0x6f, 0xfe, 0x73,
+                                            0x8c, 0xc7, 0x40, 0x79, 0x77, 0x79, 0xe8, 0x98,
+                                            0x00, 0x70, 0x0a, 0x4d, 0x41, 0x41, 0xd8, 0xab,
+                                            0x75, 0xeb, 0x4d, 0xca, 0x13, 0x59, 0x78, 0xa3};
+         BN_bin2bn(d_be, 32, d);
+
+         BN_mod_mul(v, d, y_sq, p, ctx);
+         BN_mod_add(v, v, one, p, ctx);
+
+         // x² = u · v^(p-2) mod p   (Fermat inverse)
+         BN_copy(exp, p);
+         BN_sub_word(exp, 2);
+         BN_mod_exp(x_sq, v, exp, p, ctx);
+         BN_mod_mul(x_sq, x_sq, u, p, ctx);
+
+         // Legendre symbol: (x²)^((p-1)/2) mod p; -1 ⇒ not a QR ⇒ not on curve.
+         BN_copy(exp, p);
+         BN_sub_word(exp, 1);
+         BN_rshift1(exp, exp);
+         BN_mod_exp(legendre, x_sq, exp, p, ctx);
+
+         BN_copy(neg_one, p);
+         BN_sub_word(neg_one, 1);
+
+         on_curve = (BN_cmp(legendre, neg_one) != 0);
+      }
+
+      BN_free(y);
+      BN_free(y_sq);
+      BN_free(u);
+      BN_free(v);
+      BN_free(p);
+      BN_free(d);
+      BN_free(x_sq);
+      BN_free(exp);
+      BN_free(legendre);
+      BN_free(one);
+      BN_free(neg_one);
+      BN_CTX_free(ctx);
+
+      return on_curve;
+   }
+
+}}} // fc::crypto::ed

@@ -1,0 +1,14 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/fresh/Dropbox/htdocs/The-Channel/libraries/boost/libs/context/src/asm/jump_arm64_aapcs_macho_gas.S
+
+/Users/fresh/Dropbox/htdocs/The-Channel/libraries/boost/libs/context/src/asm/make_arm64_aapcs_macho_gas.S
+
+/Users/fresh/Dropbox/htdocs/The-Channel/libraries/boost/libs/context/src/asm/ontop_arm64_aapcs_macho_gas.S
+

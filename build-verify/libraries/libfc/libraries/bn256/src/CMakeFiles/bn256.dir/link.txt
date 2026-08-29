@@ -1,0 +1,2 @@
+/usr/bin/ar qc libbn256.a CMakeFiles/bn256.dir/bn256.cpp.o CMakeFiles/bn256.dir/random_255.cpp.o
+/usr/bin/ranlib libbn256.a

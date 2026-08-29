@@ -1,0 +1,53 @@
+{
+    "initAccounts": [],
+    "abiFile": "unittests/contracts/ra.system/ra.system.abi",
+    "actions": [
+        {
+            "actionAuthAcct": "ra",
+            "actionName": "newaccount",
+            "authorization": {
+                "actor": "ra",
+                "permission": "active"
+            },
+            "actionData": {
+                "creator": "ra",
+                "name": "ACCT_PER_TRX",
+                "owner": {
+                    "threshold": 1,
+                    "keys": [
+                        {
+                            "key": "PUB_K1_65rXebLhtk2aTTzP4e9x1AQZs7c5NNXJp89W8R3HyaA6ZoHPHw",
+                            "weight": 1
+                        }
+                    ],
+                    "accounts": [],
+                    "waits": []
+                },
+                "active": {
+                    "threshold": 1,
+                    "keys": [
+                        {
+                            "key": "PUB_K1_65rXebLhtk2aTTzP4e9x1AQZs7c5NNXJp89W8R3HyaA6ZoHPHw",
+                            "weight": 1
+                        }
+                    ],
+                    "accounts": [],
+                    "waits": []
+                }
+            }
+        },
+        {
+            "actionAuthAcct": "ra",
+            "actionName": "buyrambytes",
+            "authorization": {
+                "actor": "ra",
+                "permission": "active"
+            },
+            "actionData": {
+                "payer": "ra",
+                "receiver": "ACCT_PER_TRX",
+                "bytes": "3000"
+            }
+        }
+    ]
+}

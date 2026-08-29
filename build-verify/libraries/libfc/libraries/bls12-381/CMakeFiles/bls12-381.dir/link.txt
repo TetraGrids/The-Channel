@@ -1,0 +1,2 @@
+/usr/bin/ar qc libbls12-381.a "CMakeFiles/bls12-381.dir/src/arithmetic.cpp.o" "CMakeFiles/bls12-381.dir/src/fp.cpp.o" "CMakeFiles/bls12-381.dir/src/g.cpp.o" "CMakeFiles/bls12-381.dir/src/pairing.cpp.o" "CMakeFiles/bls12-381.dir/src/scalar.cpp.o" "CMakeFiles/bls12-381.dir/src/sha256.cpp.o" "CMakeFiles/bls12-381.dir/src/signatures.cpp.o" "CMakeFiles/bls12-381.dir/src/arithmetic.s.o"
+/usr/bin/ranlib libbls12-381.a

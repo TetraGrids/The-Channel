@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsignature_provider_aws.a CMakeFiles/signature_provider_aws.dir/src/aws_common.cpp.o
+/usr/bin/ranlib libsignature_provider_aws.a

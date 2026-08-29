@@ -1,0 +1,2 @@
+/usr/bin/ar qc libstate_history.a CMakeFiles/state_history.dir/abi.cpp.o CMakeFiles/state_history.dir/create_deltas.cpp.o CMakeFiles/state_history.dir/trace_converter.cpp.o
+/usr/bin/ranlib libstate_history.a

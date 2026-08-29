@@ -1,0 +1,131 @@
+#pragma once
+#include <fc/static_variant.hpp>
+#include <fc/crypto/elliptic.hpp>
+#include <fc/crypto/elliptic_r1.hpp>
+#include <fc/crypto/elliptic_webauthn.hpp>
+#include <fc/crypto/elliptic_em.hpp>
+#include <fc/crypto/elliptic_ed.hpp>
+#include <fc/reflect/reflect.hpp>
+#include <fc/reflect/variant.hpp>
+
+namespace fc { namespace crypto {
+   namespace config {
+      constexpr const char* signature_base_prefix = "SIG";
+      constexpr const char* signature_prefix[] = {
+         "K1",
+         "R1",
+         "WA",
+         "EM",
+         "ED"
+      };
+   };
+
+   class signature
+   {
+      public:
+         using storage_type = std::variant<ecc::signature_shim, r1::signature_shim, webauthn::signature,
+                                           em::signature_shim, ed::signature_shim>;
+         enum class sig_type : uint8_t {
+            k1 = fc::get_index<storage_type, ecc::signature_shim>(),
+            r1 = fc::get_index<storage_type, r1::signature_shim>(),
+            wa = fc::get_index<storage_type, webauthn::signature>(),
+            em = fc::get_index<storage_type, em::signature_shim>(),
+            ed = fc::get_index<storage_type, ed::signature_shim>(),
+            unknown
+         };
+         static_assert(std::variant_size_v<storage_type> == static_cast<uint8_t>(sig_type::unknown), "Missing signature sig_type");
+         static_assert(std::size(config::signature_prefix) == static_cast<size_t>(sig_type::unknown), "Missing signature_prefix prefix");
+
+         constexpr static const char* sig_prefix(sig_type t) { return config::signature_prefix[static_cast<size_t>(t)]; };
+
+         signature() = default;
+         signature( signature&& ) = default;
+         signature( const signature& ) = default;
+         signature& operator= (const signature& ) = default;
+
+         explicit signature( const storage_type& other_storage )
+            :_storage(other_storage)
+         {}
+
+         explicit signature( storage_type&& other_storage )
+            :_storage(std::move(other_storage))
+         {}
+
+         // serialize to/from string; if type is unknown, infer from the string
+         explicit signature(const std::string& base58str);
+         static signature from_string(const std::string& str, sig_type type = sig_type::unknown);
+
+         // The Channel native string form always carries the SIG_<TYPE>_ prefix.
+         std::string to_string(const fc::yield_function_t& yield = fc::yield_function_t()) const;
+
+         constexpr bool is_webauthn() const { return std::holds_alternative<webauthn::signature>(_storage); }
+         constexpr bool is_r1() const { return std::holds_alternative<r1::signature_shim>(_storage); }
+
+         size_t which() const { return _storage.index(); }
+         sig_type type() const { return static_cast<sig_type>(which()); }
+
+         size_t variable_size() const;
+         bool   is_canonical() const;
+
+         template<typename... Args>
+         bool contains() const { return (std::holds_alternative<Args>(_storage) || ...); }
+
+         template<typename... Args>
+         bool contains_type(Args... types) const {
+            static_assert((std::is_same_v<Args, sig_type> && ...), "Args must be of type signature::sig_type");
+            auto current_index = _storage.index();
+            return ((current_index == static_cast<size_t>(types)) || ...);
+         }
+
+         template<typename T>
+         const T& get() const { return std::get<T>(_storage); }
+
+         /**
+          *  True if this signature variant should be handled by recover(sig, digest)
+          *  rather than a verify(sig, pubkey, digest)
+          */
+         bool is_recoverable() const {
+            return std::visit([](auto const& shim) {
+               return std::decay_t<decltype(shim)>::is_recoverable;
+            }, _storage);
+         }
+
+         template <typename Visitor>
+         decltype(auto) visit(Visitor&& v) const {
+            return std::visit(std::forward<Visitor>(v), _storage);
+         }
+
+         const storage_type& storage() const { return _storage; }
+
+      private:
+         storage_type _storage{};
+
+         friend bool operator == ( const signature& p1, const signature& p2);
+         friend bool operator != ( const signature& p1, const signature& p2);
+         friend bool operator < ( const signature& p1, const signature& p2);
+         friend std::size_t hash_value(const signature& b); //not cryptographic; for containers
+         friend struct reflector<signature>;
+         friend class private_key;
+         friend class public_key;
+   }; // signature
+
+   size_t hash_value(const signature& b);
+
+} }  // fc::crypto
+
+namespace fc {
+   void to_variant(const crypto::signature& var, variant& vo, const fc::yield_function_t& yield = fc::yield_function_t());
+
+   void from_variant(const variant& var, crypto::signature& vo);
+} // namespace fc
+
+namespace std {
+   template <> struct hash<fc::crypto::signature> {
+      std::size_t operator()(const fc::crypto::signature& k) const {
+         return fc::crypto::hash_value(k);
+      }
+   };
+} // std
+
+FC_REFLECT(fc::crypto::signature, (_storage) )
+FC_REFLECT_ENUM(fc::crypto::signature::sig_type, (k1)(r1)(wa)(em)(ed)(unknown))

@@ -1,0 +1,144 @@
+#include <fc/crypto/private_key.hpp>
+#include <fc/utility.hpp>
+#include <fc/crypto/key_serdes.hpp>
+#include <fc/exception/exception.hpp>
+
+namespace fc { namespace crypto {
+   using namespace std;
+
+   public_key private_key::get_public_key() const
+   {
+      return public_key(std::visit([](const auto& key) { return public_key::storage_type(key.get_public_key()); }, _storage));
+   }
+
+   signature private_key::sign( const sha256& digest, require_canonical_t require_canonical ) const
+   {
+      return signature(std::visit(
+         [&](const auto& key) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(key)>, em::private_key_shim> ||
+                          std::is_same_v<std::decay_t<decltype(key)>, ed::private_key_shim>) {
+               // EM enforces low-s canonical form internally; ED signatures are canonical by construction
+               return signature::storage_type(key.sign_sha256(digest));
+            } else {
+               return signature::storage_type(key.sign(digest, require_canonical));
+            }
+         }, _storage));
+   }
+
+   sha512 private_key::generate_shared_secret( const public_key& pub ) const
+   {
+      return std::visit(
+         [&]<typename KeyType>(const KeyType& key) -> sha512 {
+            if constexpr (requires { key.generate_shared_secret(std::declval<typename KeyType::public_key_type>()); }) {
+               using PublicKeyType = typename KeyType::public_key_type;
+               return key.generate_shared_secret(std::template get<PublicKeyType>(pub._storage));
+            } else {
+               FC_ASSERT(false, "shared secret generation not supported for this key type");
+            }
+         },
+         _storage);
+   }
+
+   private_key private_key::generate(key_type t) {
+      using gen_fn = private_key(*)();
+      static constexpr gen_fn generators[] = {
+         [] { return private_key(storage_type(ecc::private_key_shim::generate())); }, // k1
+         [] { return private_key(storage_type(r1::private_key_shim::generate())); },  // r1
+         [] { return private_key(storage_type(em::private_key_shim::generate())); },  // em
+         [] { return private_key(storage_type(ed::private_key_shim::generate())); },  // ed
+      };
+      auto idx = static_cast<size_t>(t);
+      FC_ASSERT(idx < std::size(generators), "Key type does not support generation");
+      return generators[idx]();
+   }
+
+   private_key private_key::from_string(const std::string& str, key_type type) {
+      switch (type) {
+      case key_type::k1:
+      case key_type::r1: {
+         private_key k(parse_unknown_private_key_str(str));
+         FC_ASSERT( k.type() == type, "Parsed type does not match specified type for ${key}",
+                    ("key", str.substr(0, 10) + "...") );
+         return k;
+      }
+      case key_type::em: {
+         auto [base_prefix, type_prefix, data_str] = parse_base_prefixes(str);
+         const auto& key = base_prefix.empty() ? str : data_str;
+         FC_ASSERT(type_prefix.empty() || type_prefix == key_prefix(key_type::em), "Invalid private key prefixes: ${key}", ("key", str.substr(0, 10) + "..."));
+         return from_native_string_to_private_key<chain_key_type_ethereum>(key);
+      }
+      case key_type::ed: {
+         auto [base_prefix, type_prefix, data_str] = parse_base_prefixes(str);
+         const auto& key = base_prefix.empty() ? str : data_str;
+         FC_ASSERT(type_prefix.empty() || type_prefix == key_prefix(key_type::ed), "Invalid private key prefixes: ${key}", ("key", str.substr(0, 10) + "..."));
+         return from_native_string_to_private_key<chain_key_type_solana>(key);
+      }
+      case key_type::unknown: {
+         if (str.find('_') == std::string::npos)
+            return private_key(parse_unknown_private_key_str(str));
+
+         auto [base_prefix, type_prefix, data_str] = parse_base_prefixes(str);
+         FC_ASSERT(base_prefix == config::private_key_base_prefix, "Invalid prefix to parse key type: ${key}", ("key", str.substr(0, 10) + "..."));
+         if (type_prefix == key_prefix(key_type::em)) {
+            return from_native_string_to_private_key<chain_key_type_ethereum>(data_str);
+         } else if (type_prefix == key_prefix(key_type::ed)) {
+            return from_native_string_to_private_key<chain_key_type_solana>(data_str);
+         }
+         return private_key(parse_unknown_private_key_str(str));
+      }
+
+      default:
+         FC_ASSERT(false, "Unknown key type");
+      };
+   }
+
+   private_key::private_key(const std::string& base58str)
+   :_storage(parse_unknown_private_key_str(base58str))
+   {}
+
+   std::string private_key::to_string(const fc::yield_function_t& yield) const
+   {
+      switch (type()) {
+      case key_type::k1:
+      case key_type::r1: {
+         auto data_str = std::visit(base58str_visitor<storage_type, config::private_key_prefix>(yield), _storage);
+         return std::string(config::private_key_base_prefix) + "_" + data_str;
+      }
+      case key_type::em: {
+         return std::string(config::private_key_base_prefix) + "_" + key_prefix(key_type::em) + "_"
+                + get<em::private_key_shim>().to_string();
+      }
+      case key_type::ed: {
+         return std::string(config::private_key_base_prefix) + "_" + key_prefix(key_type::ed) + "_"
+                + get<ed::private_key_shim>().to_string(yield);
+      }
+      case key_type::unknown:
+         break;
+      }
+
+      FC_ASSERT(false, "private_key unknown key type");
+   }
+
+   bool operator==( const private_key& p1, const private_key& p2 ) {
+      return eq_comparator<private_key::storage_type>::apply(p1._storage, p2._storage);
+   }
+
+   bool operator<( const private_key& p1, const private_key& p2 )
+   {
+      return less_comparator<private_key::storage_type>::apply(p1._storage, p2._storage);
+   }
+} } // fc::crypto
+
+namespace fc
+{
+   void to_variant(const fc::crypto::private_key& var, variant& vo, const fc::yield_function_t& yield)
+   {
+      vo = var.to_string(yield);
+   }
+
+   void from_variant(const variant& var, fc::crypto::private_key& vo)
+   {
+      vo = fc::crypto::private_key::from_string(var.as_string());
+   }
+
+} // fc

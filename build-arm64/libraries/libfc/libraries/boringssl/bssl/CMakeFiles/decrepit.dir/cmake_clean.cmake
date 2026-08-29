@@ -1,0 +1,43 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/decrepit.dir/decrepit/bio/base64_bio.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/bio/base64_bio.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/blowfish/blowfish.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/blowfish/blowfish.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/cast/cast.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/cast/cast.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/cast/cast_tables.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/cast/cast_tables.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/cfb/cfb.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/cfb/cfb.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/des/cfb64ede.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/des/cfb64ede.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/dh/dh_decrepit.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/dh/dh_decrepit.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/dsa/dsa_decrepit.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/dsa/dsa_decrepit.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/evp/dss1.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/evp/dss1.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/evp/evp_do_all.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/evp/evp_do_all.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/obj/obj_decrepit.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/obj/obj_decrepit.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/rc4/rc4_decrepit.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/rc4/rc4_decrepit.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/ripemd/ripemd.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/ripemd/ripemd.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/rsa/rsa_decrepit.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/rsa/rsa_decrepit.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/ssl/ssl_decrepit.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/ssl/ssl_decrepit.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/x509/x509_decrepit.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/x509/x509_decrepit.c.o.d"
+  "CMakeFiles/decrepit.dir/decrepit/xts/xts.c.o"
+  "CMakeFiles/decrepit.dir/decrepit/xts/xts.c.o.d"
+  "libdecrepit.a"
+  "libdecrepit.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang C)
+  include(CMakeFiles/decrepit.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

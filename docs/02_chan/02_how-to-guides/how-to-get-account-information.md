@@ -1,0 +1,56 @@
+## Overview
+
+This how-to guide provides instructions on how to query infomation of an Antelope account. The example in this how-to guide retrieves information of the `eosio` account.
+
+## Before you begin
+
+* Install the currently supported version of `chan`
+
+[[info | Note]]
+| The chan tool is bundled with the Antelope software. [Installing Antelope](../../00_install/index.md) will also install the chan tool.
+
+* Acquire functional understanding of [Antelope Accounts and Permissions](/protocol-guides/04_accounts_and_permissions.md)
+
+## Command Reference
+
+See the following reference guide for command line usage and related options for the chan command:
+
+* [`chan get account`](../03_command-reference/get/account.md) command and its parameters
+
+## Procedure
+
+The following step shows how to query information of the `eosio` account:
+
+1. Run the following command:
+
+```sh
+chan get account eosio
+```
+**Where**:
+
+* `eosio` = The name of the default system account in the Antelope blockchain.
+
+**Example Output**
+
+```console
+created: 2018-06-01T12:00:00.000
+privileged: true
+permissions:
+     owner     1:    1 PUB_K1_6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5BoDq63
+        active     1:    1 PUB_K1_6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5BoDq63
+memory:
+     quota:       unlimited  used:     3.004 KiB
+
+net bandwidth:
+     used:               unlimited
+     available:          unlimited
+     limit:              unlimited
+
+cpu bandwidth:
+     used:               unlimited
+     available:          unlimited
+     limit:              unlimited
+```
+
+[[info | Account Fields]]
+| Depending on the Antelope network you are connected, you might see different fields associated with an account. That depends on which system contract has been deployed on the network.

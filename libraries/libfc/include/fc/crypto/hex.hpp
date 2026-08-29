@@ -1,0 +1,51 @@
+#pragma once
+#include <fc/utility.hpp>
+#include <concepts>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace fc {
+    uint8_t from_hex( char c );
+    std::string to_hex( const char* d, uint32_t s, bool add_prefix = false );
+    std::string to_hex( const std::vector<char>& data );
+
+    template <typename Container>
+       requires std::contiguous_iterator<typename Container::iterator>
+    std::string to_hex(const Container& data, bool add_prefix = false) {
+       auto hex = data.size() ? to_hex(reinterpret_cast<const char*>(data.data()), data.size()) : "0";
+       return add_prefix ? "0x" + hex : hex;
+    }
+
+    std::string trim_hex_prefix(const std::string& hex);
+
+    template<typename T>
+    T hex_to_number(const std::string& hex_str) {
+       auto clean_hex_str = trim_hex_prefix(hex_str);
+       if constexpr (std::is_unsigned_v<T>) {
+          return std::stoull(clean_hex_str, nullptr, 16);
+       } else {
+          return std::stoll(clean_hex_str, nullptr, 16);
+       }
+    }
+
+    /**
+     *  @return the number of bytes decoded
+     */
+    size_t from_hex( std::string_view hex_str, char* out_data, size_t out_data_len );
+
+    std::vector<uint8_t> from_hex( const std::string& hex, bool trim_prefix = true );
+
+    /**
+     *  @return the hex string of `n`
+     */
+   template<typename I>
+   std::string itoh(I n, size_t hlen = sizeof(I)<<1) {
+       static const char* digits = "0123456789abcdef";
+       std::string r(hlen, '0');
+       for(size_t i = 0, j = (hlen - 1) * 4 ; i < hlen; ++i, j -= 4)
+           r[i] = digits[(n>>j) & 0x0f];
+       return r;
+   }
+}

@@ -1,0 +1,36 @@
+# CMake generated Testfile for 
+# Source directory: /Users/fresh/Dropbox/htdocs/The-Channel/unittests/test-contracts
+# Build directory: /Users/fresh/Dropbox/htdocs/The-Channel/build-arm64/unittests/test-contracts
+# 
+# This file includes the relevant testing commands required for 
+# testing this directory and lists subdirectories to be tested as well.
+subdirs("asserter")
+subdirs("deferred_test")
+subdirs("get_sender_test")
+subdirs("get_table_test")
+subdirs("get_table_seckey_test")
+subdirs("integration_test")
+subdirs("no_auth_table")
+subdirs("noop")
+subdirs("payloadless")
+subdirs("proxy")
+subdirs("ram_restrictions_test")
+subdirs("reject_all")
+subdirs("restrict_action_test")
+subdirs("snapshot_test")
+subdirs("sync_caller")
+subdirs("sync_callee")
+subdirs("sync_callee1")
+subdirs("test_api")
+subdirs("test_api_db")
+subdirs("test_api_multi_index")
+subdirs("test_ram_limit")
+subdirs("action_results")
+subdirs("wasm_config_bios")
+subdirs("params_test")
+subdirs("crypto_primitives_test")
+subdirs("bls_primitives_test")
+subdirs("get_block_num_test")
+subdirs("nested_container_multi_index")
+subdirs("savanna")
+subdirs("db_find_secondary_test")

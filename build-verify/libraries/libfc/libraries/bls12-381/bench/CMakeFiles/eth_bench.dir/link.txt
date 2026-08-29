@@ -1,0 +1,1 @@
+/usr/bin/c++  -Wall -Wno-deprecated-declarations -Wthread-safety -O3 -DNDEBUG -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/eth_bench.dir/eth_bench.cpp.o -o eth_bench  ../libbls12-381.a

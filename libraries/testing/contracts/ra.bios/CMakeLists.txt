@@ -1,0 +1,6 @@
+if( EOSIO_COMPILE_TEST_CONTRACTS )
+   add_contract( ra.bios ra.bios ra.bios.cpp )
+else()
+   configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/ra.bios.wasm ${CMAKE_CURRENT_BINARY_DIR}/ra.bios.wasm COPYONLY )
+   configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/ra.bios.abi  ${CMAKE_CURRENT_BINARY_DIR}/ra.bios.abi  COPYONLY )
+endif()
