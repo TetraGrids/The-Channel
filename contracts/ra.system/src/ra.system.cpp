@@ -548,7 +548,16 @@ namespace rasystem {
         res.cpu_weight = asset( 0, system_contract::get_core_symbol() );
       });
 
-      set_resource_limits( new_account_name, 0, 0, 0 );
+      user_resourcesram_table usersram( get_self(), get_self().value );
+      usersram.emplace( new_account_name, [&]( auto& row ) {
+         row.owner     = new_account_name;
+         row.ram_bytes = 0;
+         row.quantity  = asset{ 0, system_contract::get_core_symbol() };
+         row.ramlimit  = 0;
+         row.created   = current_time_point();
+      });
+
+      set_resource_limits( new_account_name, ram_gift_bytes, 0, 0 );
    }
 
    void native::setabi( const name& acnt, const std::vector<char>& abi,
@@ -583,7 +592,7 @@ namespace rasystem {
          m.supply.symbol = ramcore_symbol;
          m.base.balance.amount = int64_t(_gstate.free_ram());
          m.base.balance.symbol = ram_symbol;
-         m.quote.balance.amount = 0;
+         m.quote.balance.amount = system_token_supply.amount / 1000;
          m.quote.balance.symbol = core;
       });
 

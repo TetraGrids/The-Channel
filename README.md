@@ -8,8 +8,8 @@ The Channel is everything Spring 2.0 was meant to be, plus:
 
 - **Signing for many types** — K1, R1, WebAuthn, plus Wire **EM** (EIP-191) and **ED** (ed25519). Link an external key with `ra.authex` and unlock a deposit through `ra.claim`.
 - **A human-first resource model** — Tonomy-style app registry and `loginwithapp` (per-app `user@app` keys). Contracts pay user-row RAM with `payer=get_self()`. Users pay CPU/NET, or rent via `ra.resources` / powerup. Block producers produce blocks.
-- **The RAM market from [XPR Network](https://github.com/ProtonProtocol)** — fixed, governance-set RAM price (`setramoption`) and subscription CPU/NET rental. REX is disabled.
-- **Dangling Spring features** — strong-QC mid-production apply and paginated `get_accounts_by_authorizers` are already in this tree. Larger unmerged Spring work (chaindb slab allocator, xxhash wrapper) is cataloged and not merged yet.
+- **The RAM market from [XPR Network](https://github.com/ProtonProtocol)** — fixed 0.0020 RA/byte pricing, age-based purchase caps, system Bancor path (`buyramsys`), and a prefunded `ra.resources` stake pool. REX is disabled.
+- **Dangling Spring features** — this Spring 2.0 base already includes strong-QC mid-production apply (#1887), paginated `get_accounts_by_authorizers` (#1894), the chaindb slab allocator (#1070 / CHAINB02), and the `fc::xxh3` wrapper (#1868).
 
 1. [Branches](#branches)
 2. [System Token](#system-token)
@@ -23,7 +23,7 @@ The Channel is everything Spring 2.0 was meant to be, plus:
 The `main` branch is the development branch; do not use it for production. Refer to the [release page](https://github.com/TetraGrids/The-Channel/releases) for current information on releases, pre-releases, and obsolete releases, as well as the corresponding tags for those releases.
 
 ## System Token
-The default system token is **RA** (4 decimals), the equivalent of EOS on EOS, WAX on WAX, or TONO on Tonomy. RAM is sold at a governance-set fixed price (default `0.0001 RA` per byte, 10% fee, 8 MiB per-account cap; change with `setramoption`). Anyone may buy RAM; apps are expected to pay user-row RAM. The core symbol can be changed at build time with `-DCORE_SYMBOL_NAME`.
+The default system token is **RA** (4 decimals). RAM is sold at a governance-set fixed price of **0.0020 RA per byte** (10% fee), matching live XPR. New accounts receive **4444** gift bytes (WebAuthn / Anchor account creation will reuse this later). Users may **purchase** up to **4 MiB** in the first year, then **+2 MiB per year**, hard-capped at **22 MiB**. `ra` can raise a personal extra with `ramlimitset` and can buy or sell beyond that on the Bancor market via `buyramsys` / `sellramsys` (XPR’s permission-gated system path). Anyone may buy RAM; apps are expected to pay user-row RAM. Change price/fee/ceiling with `setramoption`. The core symbol can be changed at build time with `-DCORE_SYMBOL_NAME`.
 
 ## Core Contracts
 All core contracts ship in this repository under [`contracts/`](./contracts), renamed to the `ra.*` namespace:
@@ -32,14 +32,14 @@ All core contracts ship in this repository under [`contracts/`](./contracts), re
 |---|---|
 | `ra.bios` | Chain bootstrapping |
 | `ra.boot` | Post-boot activation sequencing |
-| `ra.system` | Staking, voting, producers, fixed-price RAM, app registry / `loginwithapp`, powerup |
+| `ra.system` | Staking, voting, producers, fixed-price RAM, `buyramsys`, app registry / `loginwithapp`, powerup |
 | `ra.token` | Standard token (RA lives here) |
 | `ra.msig` | Multisignature proposals |
 | `ra.wrap` | Governance transaction wrapper |
 | `ra.bpay` / `ra.fees` | Block pay and fee routing |
-| `ra.resources` | Subscription CPU/NET rental (XPR-style; REX is off) |
+| `ra.resources` | Subscription CPU/NET rental. Prefund the stake pool by transferring RA with memo `fund`. |
 | `ra.authex` | External-key linking for cross-chain identity |
-| `ra.claim` | Relayer-credited deposit / user claim unlock |
+| `ra.claim` | Relayer-credited deposit / user claim unlock ([future path](./contracts/ra.claim/FUTURE.md)) |
 
 After `ra.boot` is on `ra`, activate these Spring 2.0 features before deploying `ra.system` (these digests are Spring's, not Leap 4's):
 

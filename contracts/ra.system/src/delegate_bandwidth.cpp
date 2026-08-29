@@ -29,17 +29,47 @@ namespace rasystem {
          cfg.ram_price_per_byte.symbol = core_symbol();
       }
       if ( cfg.max_per_user_bytes == 0 ) {
-         cfg.max_per_user_bytes = default_ram_user_cap;
+         cfg.max_per_user_bytes = ram_cap_max_bytes;
       }
       return cfg;
    }
 
+   void system_contract::ensure_usersram( const name& owner ) {
+      auto itr = _usersram.find( owner.value );
+      if ( itr != _usersram.end() ) {
+         return;
+      }
+      _usersram.emplace( owner, [&]( auto& row ) {
+         row.owner     = owner;
+         row.ram_bytes = 0;
+         row.quantity  = asset{ 0, core_symbol() };
+         row.ramlimit  = 0;
+         row.created   = current_time_point();
+      });
+   }
+
    int64_t system_contract::purchased_ram_cap( const name& owner, const eosio_global_stateram& cfg ) const {
       auto itr = _usersram.find( owner.value );
-      if ( itr != _usersram.end() && itr->ramlimit > 0 ) {
-         return itr->ramlimit;
+      int64_t years = 0;
+      int64_t extra = 0;
+      if ( itr != _usersram.end() ) {
+         extra = itr->ramlimit;
+         const auto created_sec = itr->created.sec_since_epoch();
+         if ( created_sec > 0 ) {
+            const int64_t now_sec = current_time_point().sec_since_epoch();
+            if ( now_sec > created_sec ) {
+               years = ( now_sec - created_sec ) / ram_cap_year_sec;
+            }
+         }
       }
-      return static_cast<int64_t>( cfg.max_per_user_bytes );
+      int128_t cap = int128_t( ram_cap_base_bytes ) + int128_t( ram_cap_per_year_bytes ) * years;
+      const int64_t ceiling = static_cast<int64_t>( cfg.max_per_user_bytes );
+      if ( cap > ceiling ) {
+         cap = ceiling;
+      }
+      cap += extra;
+      check( cap <= std::numeric_limits<int64_t>::max(), "ram cap overflow" );
+      return static_cast<int64_t>( cap );
    }
 
    void system_contract::assert_under_ram_cap( const name& owner, int64_t additional_bytes, const eosio_global_stateram& cfg ) const {
@@ -50,20 +80,12 @@ namespace rasystem {
    }
 
    void system_contract::credit_purchased_ram( const name& owner, int64_t bytes, const asset& cost ) {
+      ensure_usersram( owner );
       auto itr = _usersram.find( owner.value );
-      if ( itr == _usersram.end() ) {
-         _usersram.emplace( owner, [&]( auto& row ) {
-            row.owner     = owner;
-            row.ram_bytes = bytes;
-            row.quantity  = cost;
-            row.ramlimit  = 0;
-         });
-      } else {
-         _usersram.modify( itr, same_payer, [&]( auto& row ) {
-            row.ram_bytes += bytes;
-            row.quantity  += cost;
-         });
-      }
+      _usersram.modify( itr, same_payer, [&]( auto& row ) {
+         row.ram_bytes += bytes;
+         row.quantity  += cost;
+      });
    }
 
    asset system_contract::debit_purchased_ram( const name& owner, int64_t bytes ) {
@@ -79,9 +101,7 @@ namespace rasystem {
          row.ram_bytes -= bytes;
          row.quantity  -= refund;
       });
-      if ( itr->ram_bytes == 0 && itr->ramlimit == 0 ) {
-         _usersram.erase( itr );
-      }
+      // Keep the row so `created` (age clock) is never reset by a full sell.
       return refund;
    }
 
@@ -221,6 +241,118 @@ namespace rasystem {
       return action_return_sellram{ account, tokens_out, bytes, ram_bytes, fee };
    }
 
+   action_return_buyram system_contract::buyrambsys( const name& payer, const name& receiver, uint32_t bytes ) {
+      require_auth( get_self() );
+      check( bytes > 0, "must purchase a positive amount" );
+      auto itr = _rammarket.find( ramcore_symbol.raw() );
+      check( itr != _rammarket.end(), "ram market does not exist" );
+      const int64_t ram_reserve = itr->base.balance.amount;
+      const int64_t tok_reserve = itr->quote.balance.amount;
+      check( tok_reserve > 0, "system ram market quote reserve is empty" );
+      const int64_t cost = exchange_state::get_bancor_input( ram_reserve, tok_reserve, bytes );
+      const int64_t cost_plus_fee = static_cast<int64_t>( cost / double(0.995) );
+      check( cost_plus_fee > 0, "bancor ram cost is zero" );
+      return buyramsys( payer, receiver, asset{ cost_plus_fee, core_symbol() } );
+   }
+
+   action_return_buyram system_contract::buyramsys( const name& payer, const name& receiver, const asset& quant )
+   {
+      require_auth( get_self() );
+      if ( payer != get_self() ) {
+         require_auth( payer );
+      }
+      update_ram_supply();
+      require_recipient( payer );
+      require_recipient( receiver );
+
+      check( quant.symbol == core_symbol(), "must buy ram with core token" );
+      check( quant.amount > 0, "must purchase a positive amount" );
+
+      asset fee = quant;
+      fee.amount = ( fee.amount + 199 ) / 200; // 0.5% fee, same as the original Bancor market
+      asset quant_after_fee = quant;
+      quant_after_fee.amount -= fee.amount;
+      check( quant_after_fee.amount > 0, "ram fee consumes the entire payment" );
+
+      {
+         token::transfer_action transfer_act{ token_account, { {payer, active_permission}, {ram_account, active_permission} } };
+         transfer_act.send( payer, ram_account, quant_after_fee, "buy ram sys" );
+      }
+      if ( fee.amount > 0 ) {
+         token::transfer_action transfer_act{ token_account, { {payer, active_permission} } };
+         transfer_act.send( payer, ramfee_account, fee, "ram fee" );
+         channel_to_system_fees( ramfee_account, fee );
+      }
+
+      int64_t bytes_out = 0;
+      const auto& market = _rammarket.get( ramcore_symbol.raw(), "ram market does not exist" );
+      _rammarket.modify( market, same_payer, [&]( auto& es ) {
+         bytes_out = es.direct_convert( quant_after_fee, ram_symbol ).amount;
+      });
+      check( bytes_out > 0, "must reserve a positive amount" );
+
+      _gstate.total_ram_bytes_reserved += uint64_t( bytes_out );
+      _gstate.total_ram_stake          += quant_after_fee.amount;
+
+      const int64_t ram_bytes = add_ram( receiver, bytes_out );
+
+      system_contract::logbuyram_action logbuyram_act{ get_self(), { {get_self(), active_permission} } };
+      logbuyram_act.send( payer, receiver, quant, bytes_out, ram_bytes, fee );
+
+      return action_return_buyram{ payer, receiver, quant, bytes_out, ram_bytes, fee };
+   }
+
+   action_return_sellram system_contract::sellramsys( const name& account, int64_t bytes ) {
+      require_auth( get_self() );
+      update_ram_supply();
+      require_recipient( account );
+      check( bytes > 0, "must sell a positive amount" );
+
+      user_resources_table userres( get_self(), account.value );
+      auto res_itr = userres.find( account.value );
+      check( res_itr != userres.end(), "no resource row" );
+
+      const int64_t purchased = [&]() {
+         auto ur = _usersram.find( account.value );
+         return ur == _usersram.end() ? int64_t(0) : ur->ram_bytes;
+      }();
+      check( res_itr->ram_bytes - bytes >= purchased, "cannot sell fixed-price ram via sellramsys" );
+
+      const int64_t ram_bytes = reduce_ram( account, bytes );
+
+      asset tokens_out;
+      auto itr = _rammarket.find( ramcore_symbol.raw() );
+      check( itr != _rammarket.end(), "ram market does not exist" );
+      _rammarket.modify( itr, same_payer, [&]( auto& es ) {
+         tokens_out = es.direct_convert( asset( bytes, ram_symbol ), core_symbol() );
+      });
+      check( tokens_out.amount > 1, "token amount received from selling ram is too low" );
+
+      _gstate.total_ram_bytes_reserved -= static_cast<uint64_t>( bytes );
+      _gstate.total_ram_stake          -= tokens_out.amount;
+      check( _gstate.total_ram_stake >= 0, "error, attempt to unstake more tokens than previously staked" );
+
+      const int64_t fee_amt = ( tokens_out.amount + 199 ) / 200;
+      asset fee{ fee_amt, core_symbol() };
+      asset net = tokens_out;
+      net.amount -= fee.amount;
+
+      {
+         token::transfer_action transfer_act{ token_account, { {ram_account, active_permission} } };
+         transfer_act.send( ram_account, account, net, "sell ram sys" );
+      }
+      if ( fee.amount > 0 ) {
+         token::transfer_action transfer_act{ token_account, { {ram_account, active_permission} } };
+         transfer_act.send( ram_account, ramfee_account, fee, "sell ram fee" );
+         channel_to_system_fees( ramfee_account, fee );
+      }
+
+      system_contract::logsellram_action logsellram_act{ get_self(), { {get_self(), active_permission} } };
+      logsellram_act.send( account, tokens_out, bytes, ram_bytes, fee );
+
+      return action_return_sellram{ account, tokens_out, bytes, ram_bytes, fee };
+   }
+
    void system_contract::logsellram( const name& account, const asset& quantity, int64_t bytes, int64_t ram_bytes, const asset& fee ) {
       require_auth( get_self() );
       require_recipient(account);
@@ -295,7 +427,7 @@ namespace rasystem {
          cfg.ram_price_per_byte = *ram_price_per_byte;
       }
       if ( max_per_user_bytes ) {
-         check( *max_per_user_bytes > 0, "max per user bytes must be positive" );
+         check( *max_per_user_bytes >= ram_cap_base_bytes, "max per user bytes must be at least 4 MiB" );
          cfg.max_per_user_bytes = *max_per_user_bytes;
       }
       if ( ram_fee_percent ) {
@@ -310,20 +442,11 @@ namespace rasystem {
       require_auth( get_self() );
       check( is_account( account ), "account does not exist" );
       check( ramlimit >= 0, "ram limit must be non-negative" );
-
+      ensure_usersram( account );
       auto itr = _usersram.find( account.value );
-      if ( itr == _usersram.end() ) {
-         _usersram.emplace( get_self(), [&]( auto& row ) {
-            row.owner     = account;
-            row.ram_bytes = 0;
-            row.quantity  = asset{ 0, core_symbol() };
-            row.ramlimit  = ramlimit;
-         });
-      } else {
-         _usersram.modify( itr, same_payer, [&]( auto& row ) {
-            row.ramlimit = ramlimit;
-         });
-      }
+      _usersram.modify( itr, same_payer, [&]( auto& row ) {
+         row.ramlimit = ramlimit;
+      });
    }
 
    int64_t system_contract::reduce_ram( const name& owner, int64_t bytes ) {

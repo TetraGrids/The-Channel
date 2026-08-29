@@ -14,9 +14,9 @@ namespace eosio {
    using std::string;
 
    /**
-    * Simple deposit-there / claim-here unlock. A relayer records an external
-    * deposit; the recipient withdraws RA from this contract's treasury.
-    * This is not Wire OPP (no outposts, batch operators, or msgch).
+    * Simple deposit-there / claim-here unlock. v1 uses a trusted relayer
+    * (`credit` then `claim`). See FUTURE.md for signature-verified linking
+    * and proving. This is not Wire OPP.
     */
    class [[eosio::contract("ra.claim")]] claimc : public contract {
       public:

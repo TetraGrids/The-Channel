@@ -13,9 +13,9 @@ namespace eosio {
    using std::string;
 
    /**
-    * XPR-style CPU/NET subscription rental. ra.resources holds a stake pool,
-    * delegates to subscribers for a plan duration, and undelegate on expiry.
-    * Users pay a rental fee; REX is not used.
+    * XPR-style CPU/NET subscription rental. Prefund the stake pool by
+    * transferring RA to this contract with memo `fund`. Users pay a plan
+    * fee; the contract delegates from that pool. REX is not used.
     */
    class [[eosio::contract("ra.resources")]] resources : public contract {
       public:

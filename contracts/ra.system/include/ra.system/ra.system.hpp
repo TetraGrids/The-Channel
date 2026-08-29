@@ -72,11 +72,15 @@ namespace rasystem {
    static constexpr uint32_t blocks_per_day        = 2 * seconds_per_day; // half seconds per day
 
    static constexpr int64_t  min_activated_stake   = 150'000'000'0000;
-   static constexpr int64_t  ram_gift_bytes        = 6000; // Tonomy-style starter RAM for new accounts
+   static constexpr int64_t  ram_gift_bytes        = 4444;  // starter quota at account creation (WebAuthn / Anchor later)
    static constexpr int64_t  ram_fee_precision     = 10000; // 10000 = 100%
    static constexpr int64_t  default_ram_fee_pct   = 1000;  // 10%
-   static constexpr int64_t  default_ram_price_amt = 1;     // 0.0001 RA / byte at precision 4
-   static constexpr uint64_t default_ram_user_cap  = 8ull * 1024 * 1024; // 8 MiB
+   static constexpr int64_t  default_ram_price_amt = 20;    // 0.0020 RA / byte at precision 4 (XPR live price)
+   static constexpr uint64_t ram_cap_base_bytes    = 4ull * 1024 * 1024;  // < 1 year old
+   static constexpr uint64_t ram_cap_per_year_bytes = 2ull * 1024 * 1024; // +2 MiB per full year
+   static constexpr uint64_t ram_cap_max_bytes     = 22ull * 1024 * 1024; // hard ceiling
+   static constexpr int64_t  ram_cap_year_sec      = int64_t(365) * seconds_per_day;
+   static constexpr uint64_t default_ram_user_cap  = ram_cap_max_bytes;
    static constexpr int64_t  min_pervote_daily_pay = 100'0000;
    static constexpr uint32_t refund_delay_sec      = 3 * seconds_per_day;
 
@@ -215,13 +219,16 @@ namespace rasystem {
 
    /**
     * Per-account purchased RAM and cost basis. Sell refunds at average cost so
-    * ra.ram stays solvent at a fixed price.
+    * ra.ram stays solvent at a fixed price. `created` is the account's RAM-age
+    * clock (set at newaccount). `ramlimit` is extra bytes the system grants on
+    * top of the age cap, matching XPR ramlimitset.
     */
    struct [[eosio::table, eosio::contract("ra.system")]] user_resourcesram {
-      name     owner;
-      int64_t  ram_bytes = 0;
-      asset    quantity  = asset{ 0, symbol(symbol_code("RA"), 4) };
-      int64_t  ramlimit  = 0; // 0 = use global max_per_user_bytes
+      name       owner;
+      int64_t    ram_bytes = 0;
+      asset      quantity  = asset{ 0, symbol(symbol_code("RA"), 4) };
+      int64_t    ramlimit  = 0; // extra bytes beyond the age cap; 0 = none
+      time_point created;
 
       uint64_t primary_key() const { return owner.value; }
    };
@@ -1330,6 +1337,19 @@ namespace rasystem {
          action_return_buyram buyrambytes( const name& payer, const name& receiver, uint32_t bytes );
 
          /**
+          * System-only Bancor RAM purchase (XPR `buyramsys`). Does not count against the
+          * per-account age cap. Only `ra` may call this.
+          */
+         [[eosio::action]]
+         action_return_buyram buyramsys( const name& payer, const name& receiver, const asset& quant );
+
+         /**
+          * System-only Bancor buy of an exact byte count (XPR `buyrambsys`).
+          */
+         [[eosio::action]]
+         action_return_buyram buyrambsys( const name& payer, const name& receiver, uint32_t bytes );
+
+         /**
           * The buyramself action is designed to enhance the permission security by allowing an account to purchase RAM exclusively for itself.
           * This action prevents the potential risk associated with standard actions like buyram and buyrambytes,
           * which can transfer EOS tokens out of the account, acting as a proxy for ra.token::transfer.
@@ -1362,6 +1382,13 @@ namespace rasystem {
           */
          [[eosio::action]]
          action_return_sellram sellram( const name& account, int64_t bytes );
+
+         /**
+          * System-only Bancor RAM sell (XPR `sellramsys`). Only `ra` may call this.
+          * Cannot sell bytes that were bought on the fixed-price market.
+          */
+         [[eosio::action]]
+         action_return_sellram sellramsys( const name& account, int64_t bytes );
 
          /**
           * Logging for sellram action
@@ -1427,7 +1454,8 @@ namespace rasystem {
                             const std::optional<uint16_t>& ram_fee_percent );
 
          /**
-          * Override the per-account purchased-RAM cap. 0 restores the global cap.
+          * Grant extra purchased-RAM quota on top of the age cap (XPR ramlimitset).
+          * 0 means no extra. Only ra may call this.
           */
          [[eosio::action]]
          void ramlimitset( const name& account, int64_t ramlimit );
@@ -1872,8 +1900,11 @@ namespace rasystem {
          using undelegatebw_action = eosio::action_wrapper<"undelegatebw"_n, &system_contract::undelegatebw>;
          using buyram_action = eosio::action_wrapper<"buyram"_n, &system_contract::buyram>;
          using buyrambytes_action = eosio::action_wrapper<"buyrambytes"_n, &system_contract::buyrambytes>;
+         using buyramsys_action = eosio::action_wrapper<"buyramsys"_n, &system_contract::buyramsys>;
+         using buyrambsys_action = eosio::action_wrapper<"buyrambsys"_n, &system_contract::buyrambsys>;
          using logbuyram_action = eosio::action_wrapper<"logbuyram"_n, &system_contract::logbuyram>;
          using sellram_action = eosio::action_wrapper<"sellram"_n, &system_contract::sellram>;
+         using sellramsys_action = eosio::action_wrapper<"sellramsys"_n, &system_contract::sellramsys>;
          using logsellram_action = eosio::action_wrapper<"logsellram"_n, &system_contract::logsellram>;
          using ramtransfer_action = eosio::action_wrapper<"ramtransfer"_n, &system_contract::ramtransfer>;
          using ramburn_action = eosio::action_wrapper<"ramburn"_n, &system_contract::ramburn>;
@@ -1971,6 +2002,7 @@ namespace rasystem {
          void transfer_purchased_ram( const name& from, const name& to, int64_t bytes );
          int64_t purchased_ram_cap( const name& owner, const eosio_global_stateram& cfg ) const;
          void assert_under_ram_cap( const name& owner, int64_t additional_bytes, const eosio_global_stateram& cfg ) const;
+         void ensure_usersram( const name& owner );
 
          // defined in voting.cpp
          void register_producer( const name& producer, const eosio::block_signing_authority& producer_authority, const std::string& url, uint16_t location );
