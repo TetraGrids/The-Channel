@@ -68,7 +68,7 @@ namespace rasystem {
       auth.keys.push_back( key_weight{ key, 1 } );
 
       native::updateauth_action upd{ get_self(), { { user, parent } } };
-      upd.send( user, app, parent, auth, {} );
+      upd.send( user, app, parent, auth, eosio::binary_extension<name>{} );
    }
 
 } // namespace rasystem
