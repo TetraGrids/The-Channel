@@ -6,7 +6,7 @@ Douglas Butner, AKA Gudasol (🜛)
 Tetra Grids, LLC (⟁)  
 Maryland, United States
 
-v1.0.0
+v1.0.1
 
 [The Channel](./WHITEPAPER.md) is the protocol. This paper is the money: how a token can be turned back into what it claimed to be, and how holding it can pay you for *use*.
 
@@ -18,7 +18,7 @@ v1.0.0
 
 Most “backed” tokens fail a child’s test. Can I sell this for the thing on the label? Does anyone get paid because the token *moved*, or only because a story was told?
 
-We ran the answer in public. A community project on XPR became the number one volume community project on Antelope, and the number one locked stablecoin liquidity on that network. **The Channel** makes that pattern native.
+We ran the answer in public. A community project on XPR became the number one volume community project on Antelope, and the number one locked stablecoin liquidity on that network. The live documentation of that work is [flex.report](https://flex.report). **The Channel** makes that pattern native.
 
 I will define every term before I lean on it.
 
@@ -89,7 +89,13 @@ This is interest in the only honest sense. It is not interest on a loan that cre
 
 ---
 
-## 6. Two versions of every bridged asset
+## 6. Flex token technology
+
+The stream in the previous section is **Flex token technology**: tax into a pool, splash to holders, chosen reward token, inheritance, opt out. Spec: [flex.report](https://flex.report). Pure Liquid is the vault. Flex is the stream on that vault.
+
+---
+
+## 7. Two versions of every bridged asset
 
 When an asset is brought onto **The Channel**, it is not one ticker with a story.
 
@@ -103,7 +109,7 @@ You may hold A, or B, or both. They are not the same object. A maps custody. B i
 
 ---
 
-## 7. Systemic pools
+## 8. Systemic pools
 
 **Systemic pools** are ranged vaults the protocol owns and locks. They stay on, in the spirit of [continuous liquidity](https://docs.thorchain.org/technical-documentation/thorchain-finance/continuous-liquidity-pools): people need to trade, fees exist, those fees belong to the network.
 
@@ -111,7 +117,7 @@ They sit beside the Pure Liquid twins. Together they are the guarantee. If you h
 
 ---
 
-## 8. What holders get
+## 9. What holders get
 
 - **Liquidity for redemption** of the underlying, as strong as the lock and the depth of the range.
 - A **stream** in any listed token on The Channel.
@@ -127,6 +133,7 @@ They sit beside the Pure Liquid twins. Together they are the guarantee. If you h
 - [Uniswap v3 Core](https://uniswap.org/whitepaper-v3.pdf)
 - [THORChain: Continuous Liquidity Pools](https://docs.thorchain.org/technical-documentation/thorchain-finance/continuous-liquidity-pools)
 - [Web 4 Manifesto](https://github.com/dougbutner/web-4) (2020)
+- [Flex Report](https://flex.report) (Flex token technology)
 
 ---
 
