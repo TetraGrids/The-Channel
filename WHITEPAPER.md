@@ -30,7 +30,7 @@ People come together and share ideas. That is the valuable societal change.
 
 **The Channel** is a human-first layer-1: names you can say, permissions you can nest, resources you can understand. Tetra Grids implements it in C++ from Spring 2.0 (Antelope) with Savanna consensus. You can run the node. Others can run it too.
 
-We use **RA** for the system token. RA meters storage and compute. RA is not Pure Liquid.
+We use **RA** for the system token. RA meters storage and compute. RA is redeemable for provable attention through human-verified interaction with content through the discovery network. RA is not Pure Liquid; it is liquid for attention in the discovery network.
 
 **Ranged liquidity** means a pool that is a market only inside a chosen price band (the Uniswap v3 idea: capital is not smeared from zero to infinity). **Locked** means that inventory cannot be pulled until a stated time. **Pure Liquid** means the entire supply starts in those locked bands; circulating units were bought out; income is a fee on activity, not a print. We already ran this in public. It became the number one volume community project on Antelope, and the number one locked stablecoin liquidity on XPR.
 
