@@ -22,7 +22,8 @@ namespace rasystem {
    using eosio::token;
 
    eosio_global_stateram system_contract::ram_config() const {
-      auto cfg = _globalram.get_or_default();
+      global_state_ram_singleton ram( get_self(), get_self().value );
+      auto cfg = ram.get_or_default();
       if ( cfg.ram_price_per_byte.amount <= 0 ) {
          cfg.ram_price_per_byte = asset{ default_ram_price_amt, core_symbol() };
       } else if ( cfg.ram_price_per_byte.symbol != core_symbol() ) {
