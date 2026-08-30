@@ -29,7 +29,7 @@ jobs:
       CDT_DEB_SHA256: "d946e6b64f297442d19e486401aa49f956080b07a1fa6335f29976106175b588"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install CDT
         run: |
@@ -77,7 +77,28 @@ jobs:
             -DSYSTEM_BLOCKCHAIN_PARAMETERS=ON
 
       - name: Build contracts
-        run: cmake --build build-contracts --parallel "$(nproc)"
+        run: |
+          set -euo pipefail
+          set +e
+          cmake --build build-contracts --parallel "$(nproc)" 2>&1 | tee build-contracts.log
+          status=${PIPESTATUS[0]}
+          set -e
+          {
+            echo "## Compile status: ${status}"
+            echo
+            echo '```'
+            grep -E 'error:|fatal error|undefined reference|Error' build-contracts.log | tail -120 || echo "(no error: lines; see full log artifact)"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+          exit "${status}"
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-build-log
+          path: build-contracts.log
+          if-no-files-found: ignore
 
       - name: List artifacts
         run: |
