@@ -18,11 +18,13 @@ This paper is living. As The Channel is built, this text will move with it. A co
 
 Bitcoin named the original goal: **return power to the people**. It tried to do that by *removing* trust. **The Channel** keeps the goal and reverses the method. We create **networks of trust** through repeated attention to human effort and experience over time.
 
-Bitcoin channels money to machines, to those who build the machines, to those who extract the rare earth minerals those machines require, and to those who generate the power. That power is burned as fossil fuel. It is also burned to manufacture “renewables,” which still need those minerals. Earth is then organized around mines, chips, and plants. That organization is unnecessary. It is unnatural.
+Bitcoin channels money to machines, to those who build the machines, to those who extract the rare earth minerals those machines require, and to those who generate the power. That power is burned as fossil fuel. It is also sourced from “renewables,” often requiring rare earth minerals. Earth is then organized around leaky mines, chip factories, loud data centers, and power plants. That organization is unnecessary and unnatural.
 
-The Channel organizes people. It is **time-based**: a claim belongs to a person and an interval of life, not to whoever can waste the most energy this block. On that ground we add an evolutionary financial layer. We call a unit **Pure Liquid** when its whole supply is locked as ranged liquidity against a real asset (so it can be redeemed) and when it pays **activity-based interest** (a share of real volume) to accounts, in the same token or in another token on the network.
+The Channel organizes people. It is **time-based**: rewarding attention for the value we're offering the world in democratic competetions and daily income gleamed from system-wide opt-out taxes on movemment of assets every interval of life, not to whoever can waste the most energy this block. On that ground we add an evolutionary financial layer. We call a currency **Pure Liquid** when its whole supply is locked as ranged liquidity against a real or more trusted asset (so it can be redeemed instantly without any third party constraint) and **Flex**, when it pays **activity-based interest** (a share of real volume) to accounts, in the same token or in another token on the network, because the reward asset is flexible to the desire of the holder.
 
-People come together and share ideas. That is the valuable societal change.
+People come together and share ideas. That's the valuable societal change.
+
+Assets come together to provide sane economies. That's the basis of economies based on surplus, not debt.
 
 ---
 
