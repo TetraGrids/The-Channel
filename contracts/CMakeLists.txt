@@ -57,5 +57,6 @@ add_subdirectory(ra.resources)
 add_subdirectory(ra.authex)
 add_subdirectory(ra.claim)
 add_subdirectory(ra.org)
+add_subdirectory(ra.pure)
 
 add_subdirectory(test_contracts)

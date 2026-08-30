@@ -1,11 +1,12 @@
-#include "grams.hpp"
+#include "flex.token.hpp"
 #include <cstdint>
+#include <cmath>
 
-//contractName:grams
+//contractName:flex.token
 
 namespace eosio {
 
-// === grams Token Implementation === //
+// === flex.token Token Implementation === //
 // --- Helpers & Core Actions --- //
 static string min_amount_str(uint8_t precision) {
     if(precision == 0) return string("1");
@@ -15,7 +16,7 @@ static string min_amount_str(uint8_t precision) {
 }
 
 // --- Core Token Actions --- //
-ACTION grams::forge(const name& issuer, const asset& maximum_supply) {
+ACTION flex_token::forge(const name& issuer, const asset& maximum_supply) {
     /*/
     Creates a new token with the specified maximum supply.
     Only the contract account can create new tokens.
@@ -45,7 +46,7 @@ ACTION grams::forge(const name& issuer, const asset& maximum_supply) {
     config.set({sym, 0, 100, 100, 0, 100, get_self()}, get_self());
 }//END create
 
-ACTION grams::mint(const name& to, const asset& quantity, const string& memo) {
+ACTION flex_token::mint(const name& to, const asset& quantity, const string& memo) {
     auto sym = quantity.symbol;
     check(sym.is_valid(), "🜚 invalid symbol name");
     check(memo.size() <= 256, "✍️ memo has more than 256 bytes");
@@ -72,7 +73,7 @@ ACTION grams::mint(const name& to, const asset& quantity, const string& memo) {
     update_flex_balance(st.issuer, quantity);
 }
 
-ACTION grams::transfer(const name& from, const name& to, const asset& quantity, const string& memo) {
+ACTION flex_token::transfer(const name& from, const name& to, const asset& quantity, const string& memo) {
     check(has_auth(from) || has_auth(get_self()), "🜚 missing required authority of sender or contract");
     check(from != to, "🜚 cannot transfer to self");
     check(is_account(to), "🜚 to account does not exist");
@@ -176,7 +177,7 @@ ACTION grams::transfer(const name& from, const name& to, const asset& quantity, 
     }
 }//END transfer
 
-void grams::sub_balance(const name& owner, const asset& value) {
+void flex_token::sub_balance(const name& owner, const asset& value) {
     accounts from_acnts(get_self(), owner.value);
     const auto& from = from_acnts.get(value.symbol.code().raw(), "no balance object found");
     check(from.balance.amount >= value.amount, "overdrawn balance");
@@ -186,7 +187,7 @@ void grams::sub_balance(const name& owner, const asset& value) {
     });
 }
 
-void grams::add_balance(const name& owner, const asset& value, const name& ram_payer) {
+void flex_token::add_balance(const name& owner, const asset& value, const name& ram_payer) {
     accounts to_acnts(get_self(), owner.value);
     auto to = to_acnts.find(value.symbol.code().raw());
     if(to == to_acnts.end()) {
@@ -200,7 +201,7 @@ void grams::add_balance(const name& owner, const asset& value, const name& ram_p
     }
 }
 
-void grams::update_flex_balance(const name& owner, const asset& value) {
+void flex_token::update_flex_balance(const name& owner, const asset& value) {
     flexers flex_acnts(get_self(), get_self().value);
     auto flex_it = flex_acnts.find(owner.value);
     
@@ -231,7 +232,7 @@ void grams::update_flex_balance(const name& owner, const asset& value) {
     }
 }
 
-ACTION grams::smelt(const name& username, const asset& quantity, const string& memo) {
+ACTION flex_token::smelt(const name& username, const asset& quantity, const string& memo) {
     auto sym = quantity.symbol;
     check(sym.is_valid(), "🜚 invalid symbol name");
     check(memo.size() <= 256, "memo has more than 256 bytes");
@@ -263,7 +264,7 @@ ACTION grams::smelt(const name& username, const asset& quantity, const string& m
     }
 }
 
-void grams::open(const name& owner, const symbol& symbol, const name& ram_payer) {
+void flex_token::open(const name& owner, const symbol& symbol, const name& ram_payer) {
     require_auth(ram_payer);
 
     check(is_account(owner), "owner account does not exist");
@@ -282,7 +283,7 @@ void grams::open(const name& owner, const symbol& symbol, const name& ram_payer)
     }
 }
 
-void grams::close(const name& owner, const symbol& symbol) {
+void flex_token::close(const name& owner, const symbol& symbol) {
     require_auth(owner);
     accounts acnts(get_self(), owner.value);
     auto it = acnts.find(symbol.code().raw());
@@ -291,12 +292,12 @@ void grams::close(const name& owner, const symbol& symbol) {
     acnts.erase(it);
 }
 
-void grams::set_distribution_config(const symbol& sym, uint64_t start, uint32_t lim, uint16_t reflection_rate, uint16_t burn_rate, uint16_t project_rate, const name& project_account) {
+void flex_token::set_distribution_config(const symbol& sym, uint64_t start, uint32_t lim, uint16_t reflection_rate, uint16_t burn_rate, uint16_t project_rate, const name& project_account) {
     distribution_singleton config(get_self(), get_self().value);
     config.set({sym, start, lim, reflection_rate, burn_rate, project_rate, project_account}, get_self());
 }
 
-ACTION grams::renounce(const name& account, const bool& ban_status) {
+ACTION flex_token::renounce(const name& account, const bool& ban_status) {
     // If account is trying to ban themselves, allow it only for banning
     if (has_auth(account)) {
         check(ban_status == true, "🜚 you can remove reflections, not add them back. whoops 🤷");
@@ -331,7 +332,7 @@ ACTION grams::renounce(const name& account, const bool& ban_status) {
     }
 }
 
-ACTION grams::reflect() {
+ACTION flex_token::reflect() {
     // --- Contract Distribution --- //
     distribution_singleton config(get_self(), get_self().value);
     check(config.exists(), "🜚 distribution config not set");
@@ -360,7 +361,7 @@ ACTION grams::reflect() {
     uint32_t processed = 0;
     auto itr = conf.start_key == 0 ? flex_table.begin() : flex_table.lower_bound(conf.start_key);
 
-    std::string default_memo = "Pure liquid gold 🜚 GRAMS 🜚 shine on kin @ flex.town 👀";
+    std::string default_memo = "Pure liquid 🜚 FLEX 🜚 shine on kin @ flex.town 👀";
     /*/std::string default_memo = "swapexactin#2770,186#" + 
                               itr->owner.to_string() + "#" +
                               "0.000001 XUSDC@xtokens#0#reflections";/*/
@@ -519,7 +520,7 @@ ACTION grams::reflect() {
     }
 }//END radiate
 
-ACTION grams::setconfig(const symbol& sym, uint64_t start_key, uint32_t limit, uint16_t reflection_rate, uint16_t burn_rate, uint16_t project_rate, const name& project_account) {
+ACTION flex_token::setconfig(const symbol& sym, uint64_t start_key, uint32_t limit, uint16_t reflection_rate, uint16_t burn_rate, uint16_t project_rate, const name& project_account) {
     require_auth(get_self());
     check(sym.is_valid(), "🜚 invalid symbol");
     check(limit > 0, "limit must be positive");
@@ -534,7 +535,7 @@ ACTION grams::setconfig(const symbol& sym, uint64_t start_key, uint32_t limit, u
     config.set({sym, start_key, limit, reflection_rate, burn_rate, project_rate, project_account}, get_self());
 }
 
-ACTION grams::addpool(const uint64_t& id, const symbol& token_symbol, const name& token_contract, const string& pool_ids) {
+ACTION flex_token::addpool(const uint64_t& id, const symbol& token_symbol, const name& token_contract, const string& pool_ids) {
     require_auth(get_self());
     check(is_account(token_contract), "token contract account does not exist 🤷");
     check(token_symbol.is_valid(), "🜚 invalid symbol");
@@ -559,14 +560,14 @@ ACTION grams::addpool(const uint64_t& id, const symbol& token_symbol, const name
     }
 }
 
-ACTION grams::interestoken(const name& owner, const string& token_symbol) {
+ACTION flex_token::interestoken(const name& owner, const string& token_symbol) {
     require_auth(owner);
     
     flexers flex_table(get_self(), get_self().value);
     auto flex_it = flex_table.find(owner.value);
     
     // If token_symbol is empty, reset to default (0)
-    if(token_symbol.empty() || token_symbol == "GRAMS") {
+    if(token_symbol.empty() || token_symbol == "FLEX") {
         if(flex_it != flex_table.end()) {
             flex_table.modify(flex_it, same_payer, [&](auto& f) {
                 f.flextoken = 0;
@@ -604,7 +605,7 @@ ACTION grams::interestoken(const name& owner, const string& token_symbol) {
     }
 }
 
-ACTION grams::inheritance(const name& flexer, const name& tree, const uint16_t& rate) {
+ACTION flex_token::inheritance(const name& flexer, const name& tree, const uint16_t& rate) {
     check(has_auth(flexer) || has_auth(get_self()), "🜚 missing authority");
     check(rate <= 10000, "🜚 rate must be 0-10000");
 
@@ -635,7 +636,7 @@ ACTION grams::inheritance(const name& flexer, const name& tree, const uint16_t& 
     }
 }
 
-ACTION grams::inheritmemo(const name& flexer, const string& custom_memo) {
+ACTION flex_token::inheritmemo(const name& flexer, const string& custom_memo) {
     check(has_auth(flexer) || has_auth(get_self()), "🜚 missing authority");
     check(custom_memo.size() <= 200, "✍️ memo has more than 200 bytes");
 
@@ -664,7 +665,7 @@ ACTION grams::inheritmemo(const name& flexer, const string& custom_memo) {
 }
 
     [[eosio::on_notify("*::transfer")]]
-    void grams::handle_transfer(name from, name to, asset quantity, string memo) {
+    void flex_token::handle_transfer(name from, name to, asset quantity, string memo) {
 
         // Only process incoming transfers to this contract
         if (to != get_self()) return;

@@ -41,6 +41,7 @@ All core contracts ship in this repository under [`contracts/`](./contracts), re
 | `ra.authex` | External-key linking for cross-chain identity |
 | `ra.claim` | Relayer-credited deposit / user claim unlock ([future path](./contracts/ra.claim/FUTURE.md)) |
 | `ra.org` | Org backpay: monthly role salaries in bucks, self/manager/peer review, trickle payout |
+| `flex.token` | Pure Liquid token (`contracts/ra.pure/flex.token.cpp`). Protocol-level ranged pools still need permission work — see [TO-DO-B4-MAINNET.md](./TO-DO-B4-MAINNET.md). |
 
 After `ra.boot` is on `ra`, activate these Spring 2.0 features before deploying `ra.system` (these digests are Spring's, not Leap 4's):
 

@@ -9,8 +9,8 @@ namespace eosio {
 
    using std::string;
 
-   // === grams Contract Interface === //
-   class [[eosio::contract("grams")]] grams : public contract {
+   // === flex.token Contract Interface === //
+   class [[eosio::contract("flex.token")]] flex_token : public contract {
       public:
          using contract::contract;
 
@@ -43,19 +43,19 @@ namespace eosio {
             return ac.balance;
          }
 
-         using forge_action = eosio::action_wrapper<"forge"_n, &grams::forge>;
-         using mint_action = eosio::action_wrapper<"mint"_n, &grams::mint>;
-         using smelt_action = eosio::action_wrapper<"smelt"_n, &grams::smelt>;
-         using transfer_action = eosio::action_wrapper<"transfer"_n, &grams::transfer>;
-         using open_action = eosio::action_wrapper<"open"_n, &grams::open>;
-         using close_action = eosio::action_wrapper<"close"_n, &grams::close>;
-         using reflect_action = eosio::action_wrapper<"reflect"_n, &grams::reflect>;
-         using setconfig_action = eosio::action_wrapper<"setconfig"_n, &grams::setconfig>;
-         using renounce_action = eosio::action_wrapper<"renounce"_n, &grams::renounce>;
-         using addpool_action = eosio::action_wrapper<"addpool"_n, &grams::addpool>;
-         using interestoken_action = eosio::action_wrapper<"interestoken"_n, &grams::interestoken>;
-         using inheritance_action = eosio::action_wrapper<"inheritance"_n, &grams::inheritance>;
-         using inheritmemo_action = eosio::action_wrapper<"inheritmemo"_n, &grams::inheritmemo>;
+         using forge_action = eosio::action_wrapper<"forge"_n, &flex_token::forge>;
+         using mint_action = eosio::action_wrapper<"mint"_n, &flex_token::mint>;
+         using smelt_action = eosio::action_wrapper<"smelt"_n, &flex_token::smelt>;
+         using transfer_action = eosio::action_wrapper<"transfer"_n, &flex_token::transfer>;
+         using open_action = eosio::action_wrapper<"open"_n, &flex_token::open>;
+         using close_action = eosio::action_wrapper<"close"_n, &flex_token::close>;
+         using reflect_action = eosio::action_wrapper<"reflect"_n, &flex_token::reflect>;
+         using setconfig_action = eosio::action_wrapper<"setconfig"_n, &flex_token::setconfig>;
+         using renounce_action = eosio::action_wrapper<"renounce"_n, &flex_token::renounce>;
+         using addpool_action = eosio::action_wrapper<"addpool"_n, &flex_token::addpool>;
+         using interestoken_action = eosio::action_wrapper<"interestoken"_n, &flex_token::interestoken>;
+         using inheritance_action = eosio::action_wrapper<"inheritance"_n, &flex_token::inheritance>;
+         using inheritmemo_action = eosio::action_wrapper<"inheritmemo"_n, &flex_token::inheritmemo>;
 
       private:
          TABLE account {

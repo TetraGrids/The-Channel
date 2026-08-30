@@ -106,6 +106,7 @@ jobs:
           find build-contracts -type f \( -name '*.wasm' -o -name '*.abi' \) | sort
           test -f build-contracts/ra.system/ra.system.wasm
           test -f build-contracts/ra.token/ra.token.wasm
+          test -f build-contracts/ra.pure/flex.token.wasm
 
       - name: Upload wasm and abi
         uses: actions/upload-artifact@v4
