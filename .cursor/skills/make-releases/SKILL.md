@@ -14,7 +14,7 @@ Repo: `TetraGrids/The-Channel`. Default branch `main` is development; do not tre
 - Ubuntu 22.04 is the supported build host. Do not release a Mac-only `channeld` binary.
 - Contracts: green **Compile contracts** workflow (CDT 4.1.1) or an Ubuntu CDT build of `contracts/`.
 - BSL `LICENSE` stays in the tree.
-- Do not `--force` push `main` or skip hooks unless the user explicitly asks.
+- Follow [never-push-commits](../never-push-commits/SKILL.md): never `git push`. Leave tags local; the user pushes.
 
 ## Version
 
@@ -29,8 +29,8 @@ Tags are `vMAJOR.MINOR.PATCH` (optional `-rc.N`). Match `CMakeLists.txt` / versi
 
 ```bash
 git tag -a vX.Y.Z -m "The Channel vX.Y.Z"
-git push origin vX.Y.Z
-gh release create vX.Y.Z --title "vX.Y.Z" --notes-file - <<'EOF'
+# User pushes the tag. Do not git push.
+# After they push: gh release create vX.Y.Z --title "vX.Y.Z" --notes-file - <<'EOF'
 ## Summary
 - 
 
@@ -55,4 +55,4 @@ EOF
 
 - Release from a dirty tree.
 - Tag `main` as production if [TO-DO-B4-MAINNET.md](../../../TO-DO-B4-MAINNET.md) still has open protocol-permission work you consider a blocker.
-- Force-push tags that already exist on the remote unless the user explicitly asks.
+- `git push` of commits or tags (the user does that).
