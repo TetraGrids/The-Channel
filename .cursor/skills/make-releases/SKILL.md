@@ -13,7 +13,7 @@ Repo: `TetraGrids/The-Channel`. Default branch `main` is development; do not tre
 
 - Ubuntu 22.04 is the supported build host. Do not release a Mac-only `channeld` binary.
 - Contracts: green **Compile contracts** workflow (CDT 4.1.1) or an Ubuntu CDT build of `contracts/`.
-- BSL `LICENSE` stays in the tree.
+- MIT `LICENSE` stays in the tree.
 - Follow [never-push-commits](../never-push-commits/SKILL.md): never `git push`. Leave tags local; the user pushes.
 
 ## Version

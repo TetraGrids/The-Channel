@@ -268,7 +268,7 @@ The Channel is built by [Tetra Grids](https://github.com/TetraGrids) standing on
 - [Tonomy](https://github.com/Tonomy-Foundation) — the human-first resource model
 - [XPR Network / Proton](https://github.com/ProtonProtocol) — the RAM market
 
-All upstream code is used under its original open-source licenses (see [LICENSE](./LICENSE) and the per-library license files).
+The Channel is MIT (see [LICENSE](./LICENSE)), matching current Spring. Third-party libraries keep their own licenses in-tree.
 
 ---
 
