@@ -1,0 +1,96 @@
+name: Compile contracts
+
+on:
+  push:
+    branches: [main, "release/*"]
+    paths:
+      - "contracts/**"
+      - ".github/workflows/compile-contracts.yml"
+  pull_request:
+    paths:
+      - "contracts/**"
+      - ".github/workflows/compile-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compile-contracts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: CDT 4.1.1 on Ubuntu 22.04
+    runs-on: ubuntu-22.04
+    env:
+      CDT_VERSION: "4.1.1"
+      # sha256 of cdt_4.1.1-1_amd64.deb (AntelopeIO/cdt v4.1.1)
+      CDT_DEB_SHA256: "d946e6b64f297442d19e486401aa49f956080b07a1fa6335f29976106175b588"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install CDT
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake wget ca-certificates
+          cdt_deb="/tmp/cdt_${CDT_VERSION}-1_amd64.deb"
+          wget -q -O "${cdt_deb}" \
+            "https://github.com/AntelopeIO/cdt/releases/download/v${CDT_VERSION}/cdt_${CDT_VERSION}-1_amd64.deb"
+          echo "${CDT_DEB_SHA256}  ${cdt_deb}" | sha256sum -c -
+          sudo apt-get install -y "${cdt_deb}"
+          cdt-cpp --version
+
+      - name: Locate CDT CMake toolchain
+        id: cdt
+        run: |
+          set -euo pipefail
+          candidates=(
+            "/usr/lib/cdt/lib/cmake/cdt/CDTWasmToolchain.cmake"
+            "/usr/opt/cdt/${CDT_VERSION}/lib/cmake/cdt/CDTWasmToolchain.cmake"
+            "/usr/lib/cmake/cdt/CDTWasmToolchain.cmake"
+          )
+          toolchain=""
+          for p in "${candidates[@]}"; do
+            if [[ -f "${p}" ]]; then
+              toolchain="${p}"
+              break
+            fi
+          done
+          if [[ -z "${toolchain}" ]]; then
+            echo "CDTWasmToolchain.cmake not in expected paths; listing cdt package files:"
+            dpkg -L cdt | grep -E 'cmake|Toolchain' || dpkg -L cdt | head -200
+            exit 1
+          fi
+          echo "toolchain=${toolchain}" >> "${GITHUB_OUTPUT}"
+          echo "Using ${toolchain}"
+
+      - name: Configure contracts
+        run: |
+          set -euo pipefail
+          cmake -S contracts -B build-contracts \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.cdt.outputs.toolchain }}" \
+            -DSYSTEM_CONFIGURABLE_WASM_LIMITS=ON \
+            -DSYSTEM_BLOCKCHAIN_PARAMETERS=ON
+
+      - name: Build contracts
+        run: cmake --build build-contracts --parallel "$(nproc)"
+
+      - name: List artifacts
+        run: |
+          set -euo pipefail
+          find build-contracts -type f \( -name '*.wasm' -o -name '*.abi' \) | sort
+          test -f build-contracts/ra.system/ra.system.wasm
+          test -f build-contracts/ra.token/ra.token.wasm
+
+      - name: Upload wasm and abi
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-wasm
+          path: |
+            build-contracts/**/*.wasm
+            build-contracts/**/*.abi
+          if-no-files-found: error

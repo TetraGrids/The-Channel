@@ -102,7 +102,7 @@ Requirements to build:
 - python3-numpy
 - zlib
 
-To also build the core contracts under `contracts/`, you will need [CDT](https://github.com/AntelopeIO/cdt) 3.x/4.x and to configure with `-DBUILD_CONTRACTS=ON`.
+To also build the core contracts under `contracts/`, you will need [CDT](https://github.com/AntelopeIO/cdt) 3.x/4.x and to configure with `-DBUILD_CONTRACTS=ON`. On macOS you can skip a local CDT install: the **Compile contracts** GitHub Action (`ubuntu-22.04`, CDT 4.1.1) builds `contracts/` and uploads `.wasm` / `.abi` artifacts. Run it from the Actions tab or push to `main`.
 
 ### Step 1 - Clone
 If you don't have The Channel repo cloned to your computer yet, open a terminal and navigate to the folder where you want to clone The Channel repository:
