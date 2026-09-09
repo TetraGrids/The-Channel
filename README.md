@@ -18,6 +18,7 @@ The Channel is everything Spring 2.0 was meant to be, plus:
 5. [Binary Installation](#binary-installation)
 6. [Build and Install from Source](#build-and-install-from-source)
 7. [Bash Autocomplete](#bash-autocomplete)
+8. [Contributing](./CONTRIBUTING.md)
 
 ## Branches
 The `main` branch is the development branch; do not use it for production. Refer to the [release page](https://github.com/TetraGrids/The-Channel/releases) for current information on releases, pre-releases, and obsolete releases, as well as the corresponding tags for those releases.
@@ -53,6 +54,16 @@ After `ra.boot` is on `ra`, activate these Spring 2.0 features before deploying 
 | `EM_ED_KEYS` | `dfc2e8e511691cb1e4c3e0792c48e2e882f74117e08b68b48f987903416bdd86` |
 
 `RAM_RESTRICTIONS` is what makes `payer=get_self()` safe. `EM_ED_KEYS` raises supported key types to 5 so EM/ED work in authorities and in `recover_key`. Do **not** activate `FORWARD_SETCODE` if `ra` should keep intercepting `setcode`.
+
+## Local launch
+
+Boot a single-producer chain with `ra.*` and **RA** (Spring 2.0 feature digests, not Leap 4):
+
+```bash
+python3 scripts/launch-devnet.py --reset
+```
+
+Needs `channeld` / `chan` / `keyd` (PATH or `build/programs/...`) and contract wasm from `-DBUILD_CONTRACTS=ON` or the **Compile contracts** Action (`--contracts-dir`). HTTP is `127.0.0.1:8888`. `--no-forward-setcode` skips `FORWARD_SETCODE` and `SAVANNA`. Ctrl-C stops the node.
 
 ## Supported Operating Systems
 We currently support the following operating systems.
