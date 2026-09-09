@@ -111,7 +111,7 @@ Tetra is why anyone would live here. Tetrans spend daily RA on **offers**: an ac
 
 **Passport.** Who you are, where you are, what you offer, stamps, accolades. One per human. Connections form when you complete offers, elect, and upvote. They fade if you vanish. This is the upstream for social recovery. This is the base of honest weight.
 
-**Discovery.** Daily charts of people, offers, and work. Regional first, then national, then global. Attention is spent as RA.
+**Discovery.** Daily charts of people, offers, and work. Regional first, then national, then global. RA is liquid for attention, and getting organic attention pays RA.
 
 **Recurve.** Fractal elections in small rooms, face to face. Already-verified people meet a new person. An oath goes on the record. That is how a key becomes a human.
 
