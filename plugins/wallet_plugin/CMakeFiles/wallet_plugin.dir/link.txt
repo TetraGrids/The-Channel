@@ -1,0 +1,2 @@
+/usr/bin/ar qc libwallet_plugin.a CMakeFiles/wallet_plugin.dir/wallet.cpp.o CMakeFiles/wallet_plugin.dir/wallet_plugin.cpp.o CMakeFiles/wallet_plugin.dir/wallet_manager.cpp.o CMakeFiles/wallet_plugin.dir/se_wallet.cpp.o CMakeFiles/wallet_plugin.dir/macos_user_auth.m.o
+/usr/bin/ranlib libwallet_plugin.a

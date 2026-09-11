@@ -1,0 +1,2 @@
+/usr/bin/ar qc libchain_plugin.a CMakeFiles/chain_plugin.dir/account_query_db.cpp.o CMakeFiles/chain_plugin.dir/trx_finality_status_processing.cpp.o CMakeFiles/chain_plugin.dir/chain_plugin.cpp.o CMakeFiles/chain_plugin.dir/trx_retry_db.cpp.o CMakeFiles/chain_plugin.dir/tracked_votes.cpp.o CMakeFiles/chain_plugin.dir/get_info_db.cpp.o
+/usr/bin/ranlib libchain_plugin.a

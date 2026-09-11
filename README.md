@@ -6,7 +6,7 @@ The human-first blockchain, built on p2p trust, mining attention, and Pure Liqui
 
 The Channel is everything Spring 2.0 was meant to be, plus:
 
-- **Signing for many types** — K1, R1, WebAuthn, plus Wire **EM** (EIP-191) and **ED** (ed25519). Link an external key with `ra.authex` and unlock a deposit through `ra.claim`.
+- **Signing for many types** — K1, R1, WebAuthn, plus Wire **EM** (EIP-191) and **ED** (ed25519). Link an external key with `ra.authex` (`linksig`) and unlock a credited deposit with `ra.claim` (`claimsig`).
 - **A human-first resource model** — Tonomy-style app registry and `loginwithapp` (per-app `user@app` keys). Contracts pay user-row RAM with `payer=get_self()`. Users pay CPU/NET, or rent via `ra.resources` / powerup. Block producers produce blocks.
 - **The RAM market from [XPR Network](https://github.com/ProtonProtocol)** — fixed 0.0020 RA/byte pricing, age-based purchase caps, system Bancor path (`buyramsys`), and a prefunded `ra.resources` stake pool. REX is disabled.
 - **Dangling Spring features** — this Spring 2.0 base already includes strong-QC mid-production apply (#1887), paginated `get_accounts_by_authorizers` (#1894), the chaindb slab allocator (#1070 / CHAINB02), and the `fc::xxh3` wrapper (#1868).
@@ -18,7 +18,8 @@ The Channel is everything Spring 2.0 was meant to be, plus:
 5. [Binary Installation](#binary-installation)
 6. [Build and Install from Source](#build-and-install-from-source)
 7. [Bash Autocomplete](#bash-autocomplete)
-8. [Contributing](./CONTRIBUTING.md)
+8. [Roundtables](#roundtables)
+9. [Contributing](./CONTRIBUTING.md)
 
 ## Branches
 The `main` branch is the development branch; do not use it for production. Refer to the [release page](https://github.com/TetraGrids/The-Channel/releases) for current information on releases, pre-releases, and obsolete releases, as well as the corresponding tags for those releases.
@@ -39,8 +40,8 @@ All core contracts ship in this repository under [`contracts/`](./contracts), re
 | `ra.wrap` | Governance transaction wrapper |
 | `ra.bpay` / `ra.fees` | Block pay and fee routing |
 | `ra.resources` | Subscription CPU/NET rental. Prefund the stake pool by transferring RA with memo `fund`. |
-| `ra.authex` | External-key linking for cross-chain identity |
-| `ra.claim` | Relayer-credited deposit / user claim unlock ([future path](./contracts/ra.claim/FUTURE.md)) |
+| `ra.authex` | External-key linking. Unsigned `createlink`, or `linksig` with an EM/ED `recover_key` over `"<pubkey>|<account>|<chain>|<nonce>|createlink auth"` |
+| `ra.claim` | Relayer `credit`, Channel-key `claim`, or `claimsig` with a linked EM/ED key ([details](./contracts/ra.claim/FUTURE.md)) |
 | `ra.org` | Org backpay: monthly role salaries in bucks, self/manager/peer review, trickle payout |
 | `flex.token` | Pure Liquid token (`contracts/ra.pure/flex.token.cpp`). Protocol-level ranged pools still need permission work — see [TO-DO-B4-MAINNET.md](./TO-DO-B4-MAINNET.md). |
 
@@ -269,6 +270,10 @@ sudo make install
 For our provided `.deb` packages simply install Ubuntu's `bash-completion` package: `apt-get install bash-completion` (you may need to log out/in after installing).
 
 If building from source install the `build/programs/chan/bash-completion/completions/chan` and `build/programs/channel-util/bash-completion/completions/channel-util` files to your bash-completion directory. Refer to [bash-completion's documentation](https://github.com/scop/bash-completion#faq) on the possible install locations.
+
+## Roundtables
+
+Meeting notes and Cursor implementation prompts live in [`roundtables/`](./roundtables/). How to file and run them: [`roundtables/README.md`](./roundtables/README.md).
 
 ## Acknowledgements
 The Channel is built by [Tetra Grids](https://github.com/TetraGrids) standing on the shoulders of:

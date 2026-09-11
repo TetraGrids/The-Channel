@@ -1,6 +1,23 @@
 #include <ra.claim/ra.claim.hpp>
+#include <ra.authex/ra.authex.hpp>
+#include <ra.authex/recover.hpp>
 
 namespace eosio {
+
+   namespace {
+
+      std::string checksum256_hex( const checksum256& h ) {
+         static constexpr char lut[] = "0123456789abcdef";
+         const auto b = h.extract_as_byte_array();
+         std::string out( 64, '0' );
+         for ( uint32_t i = 0; i < 32; ++i ) {
+            out[2 * i]     = lut[( b[i] >> 4 ) & 0xf];
+            out[2 * i + 1] = lut[b[i] & 0xf];
+         }
+         return out;
+      }
+
+   } // namespace
 
    void claimc::require_relayer() const {
       if ( has_auth( get_self() ) ) {
@@ -15,6 +32,29 @@ namespace eosio {
          }
       }
       check( ok, "missing authority of a relayer or ra.claim" );
+   }
+
+   bool claimc::linked_key_matches( const name& account, const name& chain, const vector<char>& packed ) const {
+      authex::links_table links{ authex_account, authex_account.value };
+      auto idx = links.get_index< "byaccount"_n >();
+      for ( auto itr = idx.lower_bound( account.value ); itr != idx.end() && itr->account == account; ++itr ) {
+         if ( itr->chain == chain && !itr->packedkey.empty() && itr->packedkey == packed ) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   void claimc::pay_claim( deposits_table& deposits, uint64_t id ) {
+      auto itr = deposits.require_find( id, "deposit not found" );
+      check( !itr->claimed, "deposit already claimed" );
+
+      token::transfer_action xfer{ token_account, { { get_self(), "active"_n } } };
+      xfer.send( get_self(), itr->recipient, itr->quantity, "cross-chain claim" );
+
+      deposits.modify( itr, same_payer, [&]( auto& row ) {
+         row.claimed = true;
+      });
    }
 
    void claimc::addrelayer( const name& account )
@@ -79,14 +119,22 @@ namespace eosio {
       deposits_table deposits{ get_self(), get_self().value };
       auto itr = deposits.require_find( id, "deposit not found" );
       require_auth( itr->recipient );
+      pay_claim( deposits, id );
+   }
+
+   void claimc::claimsig( uint64_t id, const vector<char>& sig )
+   {
+      deposits_table deposits{ get_self(), get_self().value };
+      auto itr = deposits.require_find( id, "deposit not found" );
       check( !itr->claimed, "deposit already claimed" );
 
-      token::transfer_action xfer{ token_account, { { get_self(), "active"_n } } };
-      xfer.send( get_self(), itr->recipient, itr->quantity, "cross-chain claim" );
+      const string msg = checksum256_hex( itr->ext_txid ) + "|" + itr->recipient.to_string() + "|"
+                         + itr->quantity.to_string() + "|" + itr->chain.to_string() + "|"
+                         + std::to_string( itr->id ) + "|claim auth";
+      auto packed = recover_packed_key( sha256_msg( msg ), sig );
+      check( linked_key_matches( itr->recipient, itr->chain, packed ), "signature does not match a linked key" );
 
-      deposits.modify( itr, same_payer, [&]( auto& row ) {
-         row.claimed = true;
-      });
+      pay_claim( deposits, id );
    }
 
 } // namespace eosio

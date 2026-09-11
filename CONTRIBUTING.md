@@ -136,6 +136,8 @@ Root cmake with `-DBUILD_CONTRACTS=ON` builds `contracts/` via the CDT Wasm tool
 
 Keep [README.md](./README.md), [docs/](./docs/), and contract notes accurate. User-visible behavior (CLI, RAM, keys, resources) needs a doc update in the same PR when practical. Prefer small doc PRs over rewrites.
 
+Roundtable meetings (transcripts → Cursor prompts) live in [roundtables/](./roundtables/). Naming and one-folder-only stages: [`.cursor/skills/roundtables/SKILL.md`](./.cursor/skills/roundtables/SKILL.md).
+
 ## Security
 
 Do **not** file public issues for vulnerabilities.

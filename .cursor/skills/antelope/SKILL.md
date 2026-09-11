@@ -10,7 +10,7 @@ description: >-
 
 This tree is Spring-family Antelope node software. Binaries are **`channeld`**, **`chan`**, **`keyd`**, **`channel-util`**. Contracts are **`ra.*`** and **`flex.token`**. WASM runtimes are **`eos-vm`**, **`eos-vm-jit`**, **`eos-vm-oc`**.
 
-Contract C++: [antelope-dev-style](../antelope-dev-style/SKILL.md). Node C++: [antelope-core-dev](../antelope-core-dev/SKILL.md). CMake for new contract files: [cmake-contract-builds](../cmake-contract-builds/SKILL.md). Never `git push`: [never-push](../never-push/SKILL.md).
+Contract C++: [antelope-dev-style](../antelope-dev-style/SKILL.md). Node C++: [antelope-core-dev](../antelope-core-dev/SKILL.md). CMake for new contract files: [cmake-contract-builds](../cmake-contract-builds/SKILL.md). Never `git push`: [never-push](../never-push/SKILL.md). Meeting prompts: [roundtables](../roundtables/SKILL.md).
 
 ## Code quality
 

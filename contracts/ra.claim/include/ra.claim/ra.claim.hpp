@@ -8,21 +8,24 @@
 #include <ra.token/ra.token.hpp>
 
 #include <string>
+#include <vector>
 
 namespace eosio {
 
    using std::string;
+   using std::vector;
 
    /**
-    * Simple deposit-there / claim-here unlock. v1 uses a trusted relayer
-    * (`credit` then `claim`). See FUTURE.md for signature-verified linking
-    * and proving. This is not Wire OPP.
+    * Simple deposit-there / claim-here unlock. Relayer `credit` records a
+    * deposit; `claim` pays with Channel account auth; `claimsig` pays with a
+    * linked EM/ED key (see FUTURE.md). This is not Wire OPP.
     */
    class [[eosio::contract("ra.claim")]] claimc : public contract {
       public:
          using contract::contract;
 
          static constexpr name token_account{"ra.token"_n};
+         static constexpr name authex_account{"ra.authex"_n};
 
          struct [[eosio::table]] relayer {
             name account;
@@ -70,8 +73,16 @@ namespace eosio {
          [[eosio::action]]
          void claim( uint64_t id );
 
+         /// Pay a credited deposit using recover_key of
+         /// `"<ext_txid>|<recipient>|<quantity>|<chain>|<id>|claim auth"`.
+         /// No Channel account signature; first authorizer pays CPU.
+         [[eosio::action]]
+         void claimsig( uint64_t id, const vector<char>& sig );
+
       private:
          void require_relayer() const;
+         void pay_claim( deposits_table& deposits, uint64_t id );
+         bool linked_key_matches( const name& account, const name& chain, const vector<char>& packed ) const;
    };
 
 } // namespace eosio

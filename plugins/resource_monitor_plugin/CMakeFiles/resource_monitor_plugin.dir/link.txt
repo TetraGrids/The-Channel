@@ -1,0 +1,2 @@
+/usr/bin/ar qc libresource_monitor_plugin.a CMakeFiles/resource_monitor_plugin.dir/resource_monitor_plugin.cpp.o CMakeFiles/resource_monitor_plugin.dir/system_file_space_provider.cpp.o
+/usr/bin/ranlib libresource_monitor_plugin.a

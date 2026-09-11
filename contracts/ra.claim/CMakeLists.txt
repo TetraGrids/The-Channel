@@ -2,7 +2,8 @@ add_contract(ra.claim ra.claim ${CMAKE_CURRENT_SOURCE_DIR}/src/ra.claim.cpp)
 
 target_include_directories(ra.claim PUBLIC
    ${CMAKE_CURRENT_SOURCE_DIR}/include
-   ${CMAKE_CURRENT_SOURCE_DIR}/../ra.token/include)
+   ${CMAKE_CURRENT_SOURCE_DIR}/../ra.token/include
+   ${CMAKE_CURRENT_SOURCE_DIR}/../ra.authex/include)
 
 set_target_properties(ra.claim
    PROPERTIES

@@ -11,3 +11,4 @@ Cursor project skills live in [`.cursor/skills/`](../.cursor/skills/). Keep that
 | [make-releases](../.cursor/skills/make-releases/SKILL.md) | Tags and GitHub releases (no push) |
 | [never-push-commits](../.cursor/skills/never-push-commits/SKILL.md) | Never `git push` commits |
 | [cmake-contract-builds](../.cursor/skills/cmake-contract-builds/SKILL.md) | Connect new contract files into existing CMake only |
+| [roundtables](../.cursor/skills/roundtables/SKILL.md) | Meeting file names and `being-discussed` / `being-implemented` / `completed` |

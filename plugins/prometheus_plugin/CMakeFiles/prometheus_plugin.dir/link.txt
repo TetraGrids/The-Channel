@@ -1,0 +1,2 @@
+/usr/bin/ar qc libprometheus_plugin.a CMakeFiles/prometheus_plugin.dir/prometheus_plugin.cpp.o
+/usr/bin/ranlib libprometheus_plugin.a

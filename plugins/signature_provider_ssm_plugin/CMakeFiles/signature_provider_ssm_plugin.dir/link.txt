@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsignature_provider_ssm_plugin.a CMakeFiles/signature_provider_ssm_plugin.dir/src/signature_provider_ssm_plugin.cpp.o CMakeFiles/signature_provider_ssm_plugin.dir/src/ssm_signature_provider.cpp.o
+/usr/bin/ranlib libsignature_provider_ssm_plugin.a

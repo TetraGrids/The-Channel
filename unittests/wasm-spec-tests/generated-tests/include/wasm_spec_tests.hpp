@@ -1,0 +1,28 @@
+#pragma once
+
+#include <boost/test/data/test_case.hpp>
+#include <boost/test/data/monomorphic/generators/xrange.hpp>
+#include <eosio/testing/tester.hpp>
+#include <contracts.hpp>
+
+#define TESTER validating_tester
+
+using namespace eosio;
+using namespace eosio::testing;
+
+inline void push_action(TESTER& tester, action&& act, uint64_t authorizer) {
+   signed_transaction trx;
+   if (authorizer) {
+      act.authorization = vector<permission_level>{{account_name(authorizer), config::active_name}};
+   }
+   trx.actions.emplace_back(std::move(act));
+   tester.set_transaction_headers(trx);
+   if (authorizer) {
+      tester.sign(trx, account_name(authorizer));
+   }
+   tester.push_transaction(trx);
+   tester.produce_block();
+}
+
+const string base_dir = "/Users/fresh/Dropbox/htdocs/The-Channel/unittests/wasm-spec-tests/generated-tests/wasms";
+

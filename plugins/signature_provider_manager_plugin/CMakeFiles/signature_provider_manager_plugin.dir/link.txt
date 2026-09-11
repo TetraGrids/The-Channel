@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsignature_provider_manager_plugin.a CMakeFiles/signature_provider_manager_plugin.dir/src/signature_provider_manager_plugin.cpp.o
+/usr/bin/ranlib libsignature_provider_manager_plugin.a

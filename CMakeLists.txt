@@ -229,6 +229,7 @@ if(BUILD_CONTRACTS)
     TEST_COMMAND ""
     INSTALL_COMMAND ""
     BUILD_ALWAYS 1)
+  add_dependencies(unit_test contracts_project)
 endif()
 
 option(DISABLE_WASM_SPEC_TESTS "disable building of wasm spec unit tests" OFF)

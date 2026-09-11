@@ -76,6 +76,9 @@ add_executable( unit_test ${UNIT_TESTS} protocol_feature_digest_tests.cpp) # bui
 target_link_libraries( unit_test eosio_chain_wrap state_history chainbase eosio_testing fc custom_appbase ${PLATFORM_SPECIFIC_LIBS} )
 
 target_compile_options(unit_test PUBLIC -DDISABLE_EOSLIB_SERIALIZE)
+if(BUILD_CONTRACTS)
+   target_compile_definitions(unit_test PRIVATE CHANNEL_CONTRACTS_DIR="${CMAKE_BINARY_DIR}/contracts")
+endif()
 target_include_directories( unit_test PUBLIC
                             ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_SOURCE_DIR}/libraries/testing/include

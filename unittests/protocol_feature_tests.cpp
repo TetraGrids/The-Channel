@@ -5,8 +5,13 @@
 #include <eosio/testing/tester.hpp>
 
 #include <fc/variant_object.hpp>
+#include <fc/io/raw.hpp>
 
 #include <boost/test/unit_test.hpp>
+
+#include <cstdio>
+#include <string>
+#include <vector>
 
 #include <contracts.hpp>
 #include <test_contracts.hpp>
@@ -1514,6 +1519,151 @@ BOOST_AUTO_TEST_CASE(webauthn_assert_recover_key) { try {
    c.produce_block();
    c.push_transaction(trx);
 
+} FC_LOG_AND_RETHROW() }
+
+static std::string wast_escape_bytes( const char* p, size_t n ) {
+   std::string o;
+   o.reserve( n * 4 );
+   for ( size_t i = 0; i < n; ++i ) {
+      char buf[8];
+      std::snprintf( buf, sizeof(buf), "\\%02x", static_cast<unsigned>( static_cast<unsigned char>( p[i] ) ) );
+      o += buf;
+   }
+   return o;
+}
+
+static std::string make_assert_recover_wast( const fc::sha256& digest, const std::vector<char>& sig,
+                                             const std::vector<char>& pub ) {
+   std::string wast;
+   wast += "(module\n (import \"env\" \"assert_recover_key\" (func $assert_recover_key (param i32 i32 i32 i32 i32)))\n";
+   wast += " (memory $0 1)\n (export \"apply\" (func $apply))\n";
+   wast += " (func $apply (param $0 i64) (param $1 i64) (param $2 i64)\n";
+   wast += "   (call $assert_recover_key (i32.const 8) (i32.const 40) (i32.const ";
+   wast += std::to_string( sig.size() );
+   wast += ") (i32.const 1024) (i32.const ";
+   wast += std::to_string( pub.size() );
+   wast += ")))\n (data (i32.const 8) \"";
+   wast += wast_escape_bytes( digest.data(), digest.data_size() );
+   wast += "\")\n (data (i32.const 40) \"";
+   wast += wast_escape_bytes( sig.data(), sig.size() );
+   wast += "\")\n (data (i32.const 1024) \"";
+   wast += wast_escape_bytes( pub.data(), pub.size() );
+   wast += "\")\n)\n";
+   return wast;
+}
+
+BOOST_AUTO_TEST_CASE(em_ed_keys_update_account_auth) { try {
+   tester c( setup_policy::preactivate_feature_and_new_bios );
+
+   const auto& pfm = c.control->get_protocol_feature_manager();
+   const auto& d = pfm.get_builtin_digest( builtin_protocol_feature_t::em_ed_keys );
+   BOOST_REQUIRE( d );
+
+   auto em_priv = private_key_type::generate( private_key_type::key_type::em );
+   auto em_pub  = em_priv.get_public_key();
+
+   c.create_account( "billy"_n );
+   c.produce_block();
+
+   BOOST_CHECK_THROW( c.set_authority( "billy"_n, config::active_name, authority( em_pub ) ),
+                      eosio::chain::unactivated_key_type );
+
+   c.activate_protocol_features( {*d} );
+   c.produce_block();
+
+   c.set_authority( "billy"_n, config::active_name, authority( em_pub ) );
+   c.produce_block();
+   c.push_reqauth( "billy"_n, {{"billy"_n, config::active_name}}, {em_priv} );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(em_ed_keys_ed_update_account_auth) { try {
+   tester c( setup_policy::preactivate_feature_and_new_bios );
+
+   const auto& pfm = c.control->get_protocol_feature_manager();
+   const auto& d = pfm.get_builtin_digest( builtin_protocol_feature_t::em_ed_keys );
+   BOOST_REQUIRE( d );
+
+   auto ed_priv = private_key_type::generate( private_key_type::key_type::ed );
+   auto ed_pub  = ed_priv.get_public_key();
+
+   c.create_account( "billy"_n );
+   c.produce_block();
+
+   BOOST_CHECK_THROW( c.set_authority( "billy"_n, config::active_name, authority( ed_pub ) ),
+                      eosio::chain::unactivated_key_type );
+
+   c.activate_protocol_features( {*d} );
+   c.produce_block();
+
+   c.set_authority( "billy"_n, config::active_name, authority( ed_pub ) );
+   c.produce_block();
+   c.push_reqauth( "billy"_n, {{"billy"_n, config::active_name}}, {ed_priv} );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(em_ed_keys_recover_key) { try {
+   tester c( setup_policy::preactivate_feature_and_new_bios );
+
+   const auto& pfm = c.control->get_protocol_feature_manager();
+   const auto& d = pfm.get_builtin_digest( builtin_protocol_feature_t::em_ed_keys );
+   BOOST_REQUIRE( d );
+
+   auto em_priv = private_key_type::generate( private_key_type::key_type::em );
+   const auto digest = fc::sha256::hash( std::string( "em recover_key fixture" ) );
+   const auto sig = em_priv.sign( digest );
+   const auto packed_sig = fc::raw::pack( sig );
+   const auto packed_pub = fc::raw::pack( em_priv.get_public_key() );
+   const auto wast = make_assert_recover_wast( digest, packed_sig, packed_pub );
+
+   c.create_account( "bob"_n );
+   c.set_code( "bob"_n, wast.c_str() );
+   c.produce_block();
+
+   signed_transaction trx;
+   action act;
+   act.account = "bob"_n;
+   act.name = ""_n;
+   act.authorization = vector<permission_level>{{"bob"_n, config::active_name}};
+   trx.actions.push_back( act );
+   c.set_transaction_headers( trx );
+   c.sign( trx, "bob"_n );
+   BOOST_CHECK_THROW( c.push_transaction( trx ), eosio::chain::unactivated_signature_type );
+
+   c.activate_protocol_features( {*d} );
+   c.produce_block();
+   c.push_transaction( trx );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(em_ed_keys_ed_recover_key) { try {
+   tester c( setup_policy::preactivate_feature_and_new_bios );
+
+   const auto& pfm = c.control->get_protocol_feature_manager();
+   const auto& d = pfm.get_builtin_digest( builtin_protocol_feature_t::em_ed_keys );
+   BOOST_REQUIRE( d );
+
+   auto ed_priv = private_key_type::generate( private_key_type::key_type::ed );
+   const auto digest = fc::sha256::hash( std::string( "ed recover_key fixture" ) );
+   const auto sig = ed_priv.sign( digest );
+   const auto packed_sig = fc::raw::pack( sig );
+   const auto packed_pub = fc::raw::pack( ed_priv.get_public_key() );
+   const auto wast = make_assert_recover_wast( digest, packed_sig, packed_pub );
+
+   c.create_account( "bob"_n );
+   c.set_code( "bob"_n, wast.c_str() );
+   c.produce_block();
+
+   signed_transaction trx;
+   action act;
+   act.account = "bob"_n;
+   act.name = ""_n;
+   act.authorization = vector<permission_level>{{"bob"_n, config::active_name}};
+   trx.actions.push_back( act );
+   c.set_transaction_headers( trx );
+   c.sign( trx, "bob"_n );
+   BOOST_CHECK_THROW( c.push_transaction( trx ), eosio::chain::unactivated_signature_type );
+
+   c.activate_protocol_features( {*d} );
+   c.produce_block();
+   c.push_transaction( trx );
 } FC_LOG_AND_RETHROW() }
 
 static const char import_set_proposed_producer_ex_wast[] = R"=====(
