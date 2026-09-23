@@ -206,8 +206,9 @@ namespace fc {
 
   using yield_function_t = optional_delegate<void()>;
 
-  template<typename T, size_t N>
-     requires (std::is_fundamental_v<T>)
+  // LLVMEmitIR.cpp / LLVMJIT.cpp are forced to gnu++17 because LLVM 11's
+  // headers are not C++20. Keep this constraint in C++17.
+  template<typename T, size_t N, typename std::enable_if<std::is_fundamental<T>::value, int>::type = 0>
   constexpr size_t data_size( const std::array<T,N>& ) {
      return sizeof(T) * N;
   }

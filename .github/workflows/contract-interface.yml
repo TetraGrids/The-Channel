@@ -1,0 +1,76 @@
+name: Contract interface
+
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-interface-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interface:
+    name: Deploy surface
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      CDT_VERSION: "4.1.1"
+      CDT_DEB_SHA256: "d946e6b64f297442d19e486401aa49f956080b07a1fa6335f29976106175b588"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install CDT
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake wget ca-certificates
+          cdt_deb="/tmp/cdt_${CDT_VERSION}-1_amd64.deb"
+          wget -q -O "${cdt_deb}" \
+            "https://github.com/AntelopeIO/cdt/releases/download/v${CDT_VERSION}/cdt_${CDT_VERSION}-1_amd64.deb"
+          echo "${CDT_DEB_SHA256}  ${cdt_deb}" | sha256sum -c -
+          sudo apt-get install -y "${cdt_deb}"
+          cdt-cpp --version
+
+      - name: Locate CDT CMake toolchain
+        id: cdt
+        run: |
+          set -euo pipefail
+          candidates=(
+            "/usr/lib/cdt/lib/cmake/cdt/CDTWasmToolchain.cmake"
+            "/usr/opt/cdt/${CDT_VERSION}/lib/cmake/cdt/CDTWasmToolchain.cmake"
+            "/usr/lib/cmake/cdt/CDTWasmToolchain.cmake"
+          )
+          toolchain=""
+          for p in "${candidates[@]}"; do
+            if [[ -f "${p}" ]]; then
+              toolchain="${p}"
+              break
+            fi
+          done
+          if [[ -z "${toolchain}" ]]; then
+            echo "CDTWasmToolchain.cmake not found" >&2
+            exit 1
+          fi
+          echo "toolchain=${toolchain}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build contracts
+        run: |
+          set -euo pipefail
+          cmake -S contracts -B build-contracts \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.cdt.outputs.toolchain }}" \
+            -DSYSTEM_CONFIGURABLE_WASM_LIMITS=ON \
+            -DSYSTEM_BLOCKCHAIN_PARAMETERS=ON
+          cmake --build build-contracts --parallel "$(nproc)" \
+            --target ra.bios ra.boot ra.token ra.system ra.authex ra.claim flex.token
+
+      - name: Interface tests
+        run: python3 tests/interface/test_deploy_surface.py build-contracts

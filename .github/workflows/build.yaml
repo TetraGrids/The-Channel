@@ -1,4 +1,4 @@
-name: "Build & Test"
+name: Build
 
 on:
   push:
@@ -20,10 +20,9 @@ defaults:
     shell: bash
 
 jobs:
-  # The previous graph called AntelopeIO/platform-cache-workflow and then
-  # compiled on runs-on: ["self-hosted", "enf-x86-beefy"]. This org has no
-  # such runners, so every push sat queued until the 24h cancel. Compile
-  # contracts already runs on ubuntu-22.04; the node does too.
+  # Node binaries only. Contract wasm/ABI checks run in contract-interface.yml
+  # and do not need this compile. The old self-hosted "Build & Test" graph
+  # never ran on this org; hosted runners have no enf-x86-beefy label.
   node:
     name: Ubuntu 22.04 node
     runs-on: ubuntu-22.04
