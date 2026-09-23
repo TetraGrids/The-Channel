@@ -1,5 +1,11 @@
 name: "Build channel"
 
+# Legacy reusable workflow from the Spring CI. Hosted builds live in
+# build.yaml. This file is not called anymore. If it is revived, the dev
+# package flag is ENABLE_CHANNEL_DEV_DEB (package.cmake), not
+# ENABLE_SPRING_DEV_DEB, and it still needs a runner with the enf-x86-beefy
+# label this org does not have.
+
 on:
   workflow_call:
     inputs:
@@ -38,7 +44,7 @@ jobs:
           run: |
             # https://github.com/actions/runner/issues/2033
             chown -R $(id -u):$(id -g) $PWD
-            cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_SPRING_DEV_DEB=On ${SPRING_PLATFORM_HAS_EXTRAS_CMAKE:+-C /extras.cmake} -GNinja
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_CHANNEL_DEV_DEB=ON ${SPRING_PLATFORM_HAS_EXTRAS_CMAKE:+-C /extras.cmake} -GNinja
             cmake --build build
             tar -pc --exclude "*.o" build | zstd --long -T0 -9 > build.tar.zst
         - name: Upload builddir
