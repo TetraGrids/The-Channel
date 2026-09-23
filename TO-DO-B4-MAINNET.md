@@ -6,4 +6,4 @@ Sync: skill `.cursor/skills/mainnet-todo-issues/SKILL.md` and workflow `.github/
 
 | ID | Task | Issue |
 | --- | --- | --- |
-| 1 | Fix the flex.token C++ contract to work with the protocol-level liquidity pools and declare, fix, and communicate permissions of these pools | |
+| 1 | Fix the flex.token C++ contract to work with the protocol-level liquidity pools and declare, fix, and communicate permissions of these pools | https://github.com/TetraGrids/The-Channel/issues/1 |

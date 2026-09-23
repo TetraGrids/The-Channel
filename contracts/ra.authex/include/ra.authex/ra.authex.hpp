@@ -68,6 +68,11 @@ namespace eosio {
          void linksig( const name& account, const name& chain, const std::string& address,
                        const std::string& pubkey, uint64_t nonce, const vector<char>& sig );
 
+         /// `ra.claim` records the key it just installed on a new account.
+         [[eosio::action]]
+         void bridgelink( const name& account, const name& chain, const std::string& address,
+                          const vector<char>& packedkey );
+
       private:
          void add_link( const name& account, const name& chain, const std::string& address,
                         const vector<char>& packedkey, const name& ram_payer );

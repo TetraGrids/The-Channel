@@ -89,18 +89,8 @@ ACTION flex_token::transfer(const name& from, const name& to, const asset& quant
 
     check(memo.size() <= 256, "✍️ memo too long ");
 
-        // Add reflections tag to swap.alcor memos ending with #0
-    if (false && to == "swap.alcor"_n && memo.size() >= 2 && memo.substr(memo.size() - 2) == "#0") {
-        std::string final_memo = memo + "#reflections";
-        action(
-            permission_level{get_self(), "active"_n},
-            get_self(),
-            "transfer"_n,
-            std::make_tuple(from, to, quantity, final_memo)
-        ).send();
-    } else {
-        require_recipient(from);
-        require_recipient(to);
+    require_recipient(from);
+    require_recipient(to);
 
         check(quantity.is_valid(), "🜚 invalid amount");
         check(quantity.amount > 0, "🜚 must transfer positive amount");
@@ -118,8 +108,8 @@ ACTION flex_token::transfer(const name& from, const name& to, const asset& quant
         auto flex_it = flex_table.find(from.value);
         bool is_banned = (flex_it != flex_table.end() && flex_it->is_banned);
         
-        // Check if sender is an Alcor-related account
-        bool is_from_alcor = (from == "alcor"_n || from == "swap.alcor"_n || from == "gold.mon3y"_n);
+        // Check if sender is the swap contract or an exempt market account
+        bool is_from_alcor = fee_exempt(from);
         
         asset total_deduction = quantity;  // Default to just the transfer amount
         asset actual_transfer = quantity;  // Amount recipient actually receives, defaults to quantity
@@ -174,7 +164,6 @@ ACTION flex_token::transfer(const name& from, const name& to, const asset& quant
         // Update flex balances for reflection calculations
         update_flex_balance(from, -total_deduction);
         update_flex_balance(to, actual_transfer);
-    }
 }//END transfer
 
 void flex_token::sub_balance(const name& owner, const asset& value) {
@@ -347,9 +336,17 @@ ACTION flex_token::reflect() {
     
     // Get total supply and alcor balances using static helper functions
     asset total_supply = get_supply(get_self(), conf.token_symbol.code());
-    asset alcor_balances = get_balance(get_self(), "alcor"_n, conf.token_symbol.code());
-    alcor_balances += get_balance(get_self(), "gold.mon3y"_n, conf.token_symbol.code());
-    alcor_balances += get_balance(get_self(), "swap.alcor"_n, conf.token_symbol.code());
+    auto balance_of = [&](const name& owner) {
+        accounts acnts(get_self(), owner.value);
+        auto it = acnts.find(conf.token_symbol.code().raw());
+        return it == acnts.end() ? asset{0, conf.token_symbol} : it->balance;
+    };
+    name swap = swap_account();
+    asset alcor_balances = balance_of(swap);
+    exempts ex(get_self(), get_self().value);
+    for (auto e = ex.begin(); e != ex.end(); ++e) {
+        if (e->account != swap) alcor_balances += balance_of(e->account);
+    }
     
     // Calculate adjusted total supply
     total_supply -= alcor_balances;
@@ -441,7 +438,7 @@ ACTION flex_token::reflect() {
                         if(pool_itr != pools.end() && !(pool_itr->token_contract == get_self() && pool_itr->token_symbol == conf.token_symbol)) {
                             string min_amount = min_amount_str(pool_itr->token_symbol.precision());
                             memo = "swapexactin#" + pool_itr->pool_ids + "#" + recipient.to_string() + "#" + min_amount + " " + pool_itr->token_symbol.code().to_string() + "@" + pool_itr->token_contract.to_string() + "#0#reflections";
-                            transfer_to = "swap.alcor"_n;
+                            transfer_to = swap_account();
                         } else {
                             memo = default_memo;
                         }
@@ -491,7 +488,7 @@ ACTION flex_token::reflect() {
             action(
                 permission_level{get_self(), "active"_n},
                 get_self(),
-                "burn"_n,
+                "smelt"_n,
                 std::make_tuple(get_self(), burn_amount, std::string("Burn " + std::to_string(conf.burn_rate/100) + "% of every transaction 🔥"))
             ).send();
         }
@@ -667,20 +664,175 @@ ACTION flex_token::inheritmemo(const name& flexer, const string& custom_memo) {
     [[eosio::on_notify("*::transfer")]]
     void flex_token::handle_transfer(name from, name to, asset quantity, string memo) {
 
-        // Only process incoming transfers to this contract
         if (to != get_self()) return;
-        if (from != "swap.alcor"_n) return;
+        name swap = swap_account();
+        if (from != swap) return;
 
-        // Check memo starts with "Col" (case sensitive)
         if (memo.length() < 3 || memo.substr(0, 3) != "Col") {return;}
+
+        distribution_singleton config(get_self(), get_self().value);
+        check(config.exists(), "🜚 distribution config not set");
+        auto conf = config.get();
+        check(conf.project_account.value != 0, "🜚 project account is not set");
+        check(is_account(conf.project_account), "🜚 project account does not exist");
+        // forge() defaults project_account to this contract. Fees already sit here.
+        if (conf.project_account == get_self()) return;
 
         action(
             permission_level{get_self(), "active"_n},
             get_first_receiver(),
             "transfer"_n,
-            std::make_tuple(get_self(), "reflections"_n, quantity,
+            std::make_tuple(get_self(), conf.project_account, quantity,
             std::string("🜚 LP Fees 🙏"))
         ).send();
     }
+
+name flex_token::swap_account() const {
+    swap_singleton cfg(get_self(), get_self().value);
+    if (!cfg.exists()) return "swap.alcor"_n;
+    auto row = cfg.get();
+    return row.swap.value ? row.swap : name("swap.alcor");
+}
+
+bool flex_token::fee_exempt(const name& account) const {
+    if (account == swap_account()) return true;
+    exempts rows(get_self(), get_self().value);
+    return rows.find(account.value) != rows.end();
+}
+
+bool flex_token::tokens_sorted(const extended_asset& a, const extended_asset& b) const {
+    if (a.contract < b.contract) return true;
+    if (b.contract < a.contract) return false;
+    return a.quantity.symbol.code() < b.quantity.symbol.code();
+}
+
+// === Protocol vaults === //
+ACTION flex_token::setswap(const name& swap) {
+    require_auth(get_self());
+    check(is_account(swap), "🜚 swap account does not exist");
+    swap_singleton cfg(get_self(), get_self().value);
+    cfg.set(swapcfg{swap}, get_self());
+}//END setswap()
+
+ACTION flex_token::setexempt(const name& account, const bool& on) {
+    require_auth(get_self());
+    check(is_account(account), "🜚 account does not exist");
+    exempts rows(get_self(), get_self().value);
+    auto itr = rows.find(account.value);
+    if (on) {
+        if (itr == rows.end()) {
+            rows.emplace(get_self(), [&](auto& row) { row.account = account; });
+        }
+    } else if (itr != rows.end()) {
+        rows.erase(itr);
+    }
+}//END setexempt()
+
+ACTION flex_token::openpool(const uint64_t& id, const extended_asset& token_a, const extended_asset& token_b,
+                            const uint128_t& sqrt_price_x64, const uint32_t& fee) {
+    require_auth(get_self());
+    check(id != 0, "🜚 vault id required");
+    check(token_a.quantity.amount == 0 && token_b.quantity.amount == 0, "🜚 pool tokens must be zero-amount");
+    check(token_a.quantity.symbol.is_valid() && token_b.quantity.symbol.is_valid(), "🜚 invalid pool symbol");
+    check(is_account(token_a.contract) && is_account(token_b.contract), "🜚 token contract does not exist");
+    check(tokens_sorted(token_a, token_b), "🜚 tokenA must sort before tokenB");
+    check(fee == 500 || fee == 3000 || fee == 10000, "🜚 fee must be 500, 3000, or 10000");
+    check(sqrt_price_x64 > 0, "🜚 sqrt price required");
+
+    vaults rows(get_self(), get_self().value);
+    check(rows.find(id) == rows.end(), "🜚 vault id already exists");
+    name swap = swap_account();
+    check(is_account(swap), "🜚 swap account does not exist");
+
+    rows.emplace(get_self(), [&](auto& row) {
+        row.id = id;
+        row.alcor_pool_id = 0;
+        row.swap = swap;
+        row.token_a = token_a;
+        row.token_b = token_b;
+        row.fee = fee;
+        row.seeded = false;
+    });
+
+    alcor::createpool(get_self(), swap, get_self(), token_a, token_b, sqrt_price_x64, fee);
+}//END openpool()
+
+ACTION flex_token::seedpool(const uint64_t& id, const uint64_t& alcor_pool_id, const asset& amount_a, const asset& amount_b,
+                            const int32_t& tick_lower, const int32_t& tick_upper, const uint32_t& unlock_time) {
+    require_auth(get_self());
+    check(alcor_pool_id != 0, "🜚 alcor pool id required");
+    check(amount_a.amount > 0 || amount_b.amount > 0, "🜚 seed at least one side");
+    check(tick_lower < tick_upper, "🜚 tickLower must be below tickUpper");
+    check(unlock_time > current_time_point().sec_since_epoch(), "🜚 unlock time must be in the future");
+
+    vaults rows(get_self(), get_self().value);
+    auto vault = rows.require_find(id, "🜚 vault not found");
+    check(!vault->seeded, "🜚 vault already seeded");
+    check(amount_a.symbol == vault->token_a.quantity.symbol, "🜚 tokenA symbol mismatch");
+    check(amount_b.symbol == vault->token_b.quantity.symbol, "🜚 tokenB symbol mismatch");
+
+    auto pool = alcor::get_pool(vault->swap, alcor_pool_id);
+    check(pool.tokenA.contract == vault->token_a.contract, "🜚 pool tokenA contract mismatch");
+    check(pool.tokenB.contract == vault->token_b.contract, "🜚 pool tokenB contract mismatch");
+    check(pool.tokenA.quantity.symbol == vault->token_a.quantity.symbol, "🜚 pool tokenA symbol mismatch");
+    check(pool.tokenB.quantity.symbol == vault->token_b.quantity.symbol, "🜚 pool tokenB symbol mismatch");
+    check(pool.fee == vault->fee, "🜚 pool fee mismatch");
+    check(pool.tickSpacing > 0, "🜚 pool tick spacing missing");
+
+    auto aligned = [](int32_t tick, int32_t spacing) {
+        int32_t mod = tick % spacing;
+        if (mod < 0) mod += spacing;
+        return mod == 0;
+    };
+    check(aligned(tick_lower, pool.tickSpacing) && aligned(tick_upper, pool.tickSpacing),
+          "🜚 ticks must be multiples of tick spacing");
+
+    if (!pool.active) {
+        auto fee = alcor::get_active_fee(vault->swap);
+        check(fee.quantity.amount > 0, "🜚 pool is inactive and has no activation fee");
+        alcor::activate_pool(get_self(), vault->swap, alcor_pool_id, fee);
+    }
+
+    if (amount_a.amount > 0) {
+        alcor::deposit(get_self(), vault->swap, extended_asset{amount_a, vault->token_a.contract});
+    }
+    if (amount_b.amount > 0) {
+        alcor::deposit(get_self(), vault->swap, extended_asset{amount_b, vault->token_b.contract});
+    }
+
+    asset min_a{0, amount_a.symbol};
+    asset min_b{0, amount_b.symbol};
+    alcor::addliquid(get_self(), vault->swap, alcor_pool_id, get_self(), amount_a, amount_b, tick_lower, tick_upper,
+                     min_a, min_b, 0);
+    alcor::lockpos(get_self(), vault->swap, alcor_pool_id, get_self(), tick_lower, tick_upper, unlock_time);
+
+    rows.modify(vault, same_payer, [&](auto& row) {
+        row.alcor_pool_id = alcor_pool_id;
+        row.tick_lower = tick_lower;
+        row.tick_upper = tick_upper;
+        row.unlock_time = unlock_time;
+        row.seeded = true;
+    });
+}//END seedpool()
+
+ACTION flex_token::collectpool(const uint64_t& id, const name& recipient, const asset& max_a, const asset& max_b) {
+    require_auth(get_self());
+    check(is_account(recipient), "🜚 recipient does not exist");
+
+    distribution_singleton config(get_self(), get_self().value);
+    name project;
+    if (config.exists()) project = config.get().project_account;
+    check(recipient == get_self() || (project.value && recipient == project),
+          "🜚 fees may only be collected to the contract or the project account");
+
+    vaults rows(get_self(), get_self().value);
+    auto vault = rows.require_find(id, "🜚 vault not found");
+    check(vault->seeded, "🜚 vault is not seeded");
+    check(max_a.symbol == vault->token_a.quantity.symbol, "🜚 tokenA symbol mismatch");
+    check(max_b.symbol == vault->token_b.quantity.symbol, "🜚 tokenB symbol mismatch");
+
+    alcor::collect(get_self(), vault->swap, vault->alcor_pool_id, get_self(), recipient, vault->tick_lower,
+                   vault->tick_upper, max_a, max_b);
+}//END collectpool()
 
 } /// namespace eosio 

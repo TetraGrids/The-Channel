@@ -30,4 +30,4 @@ Details and naming: [`.cursor/skills/roundtables/SKILL.md`](../.cursor/skills/ro
 
 | Meeting | Stage |
 | --- | --- |
-| [2026-09-09-evm-key-onboarding.md](being-implemented/2026-09-09-evm-key-onboarding.md) | being implemented |
+| [2026-09-09-evm-key-onboarding.md](completed/2026-09-09-evm-key-onboarding.md) | completed |

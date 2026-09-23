@@ -48,6 +48,31 @@ A deposit must already be `credit`ed. Anyone may submit `claimsig(id, sig)`; the
 
 v1 `claim(id)` with `require_auth(recipient)` remains.
 
+## Lazy account (claimopen)
+
+`credit` still requires the Channel account to exist. A relayer who is naming an account that does not exist yet calls `creditopen` with:
+
+- the Channel pubkey string (`PUB_EM_…` or `PUB_ED_…`)
+- `fc::raw::pack` of that same public key (`packedkey`)
+
+`claimopen` recovers
+
+```text
+<pubkey>|<ext_txid>|<recipient>|<quantity>|<chain>|<id>|claimopen auth
+```
+
+and requires the recovered packed key to equal `packedkey`. It then:
+
+1. `ra::newaccount` with that key as owner and active (`ra.claim@active` needs `eosio.code`)
+2. optionally `buyrambytes` when `cfgclaim` set `ram_bytes` > 0
+3. withholds `ram_fee` from the payout so the bridged deposit pays for the account
+4. `ra.authex::bridgelink` so later `claimsig` sees the key
+5. transfers the remainder
+
+The recipient must be 12 characters and contain no `.`. After `ra.system` is deployed, a creator other than `ra` cannot open short or dotted names (premium-name auction, or “only suffix may create this account”). Those names use `credit` once the account exists.
+
+`cfgclaim` is governance on `ra.claim`. Leave `ram_bytes` at 0 on a chain that still has unlimited RAM (the tester) and on a booted chain, where `newaccount` already gifts 4444 bytes. Set `ram_bytes` only when that gift is not enough, and set `ram_fee` to cover the extra `buyrambytes`.
+
 ## Later
 
 1. Optional: Wire’s non-aborting `try_recover_key` and contract-readable `get_permission`.

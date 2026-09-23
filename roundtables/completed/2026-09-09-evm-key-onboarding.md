@@ -1,5 +1,7 @@
 # EVM key onboarding (signature-verified authex + claims)
 
+Done in tree: `EM_ED_KEYS`, `linksig` / `claimsig`, `creditopen` / `claimopen` (lazy account, RAM withheld from the deposit), and host EM + ED signature tests in `unittests/ra.claim_tests.cpp`. Relayer `credit` / `claim` stays. On-chain proofs remain in `FUTURE.md` and are not this meeting.
+
 - **Date:** 2026-09-09
 - **People:** Douglas, Michael, Henrik
 - **Target:** Oct 24 testnet

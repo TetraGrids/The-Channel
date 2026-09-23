@@ -1,9 +1,11 @@
 #pragma once
 
+#include "alcorswap_interface.hpp"
+
 #include <eosio/asset.hpp>
 #include <eosio/eosio.hpp>
-#include <eosio/time.hpp>
 #include <eosio/singleton.hpp>
+#include <eosio/time.hpp>
 
 namespace eosio {
 
@@ -27,6 +29,20 @@ namespace eosio {
          ACTION interestoken(const name& owner, const string& token_symbol);
          ACTION inheritance(const name& flexer, const name& tree, const uint16_t& rate);
          ACTION inheritmemo(const name& flexer, const string& custom_memo);
+
+         /// @notice DEX account that owns protocol ranged vaults. Default `swap.alcor`.
+         ACTION setswap(const name& swap);
+         /// @notice Accounts that skip the reflection tax (the swap account always skips).
+         ACTION setexempt(const name& account, const bool& on);
+         /// @notice Create an Alcor pool for a protocol vault. Tokens must be sorted. Amounts must be zero.
+         /// @dev Does not seed liquidity. Call `seedpool` once `logpool` returns the id.
+         ACTION openpool(const uint64_t& id, const extended_asset& token_a, const extended_asset& token_b,
+                         const uint128_t& sqrt_price_x64, const uint32_t& fee);
+         /// @notice Deposit, add a locked range, and record the Alcor pool id.
+         ACTION seedpool(const uint64_t& id, const uint64_t& alcor_pool_id, const asset& amount_a, const asset& amount_b,
+                         const int32_t& tick_lower, const int32_t& tick_upper, const uint32_t& unlock_time);
+         /// @notice Collect fees from a locked protocol position. No `subliquid` / `transferpos`.
+         ACTION collectpool(const uint64_t& id, const name& recipient, const asset& max_a, const asset& max_b);
          
          [[eosio::on_notify("*::transfer")]]
          void handle_transfer(name from, name to, asset quantity, string memo);
@@ -56,6 +72,11 @@ namespace eosio {
          using interestoken_action = eosio::action_wrapper<"interestoken"_n, &flex_token::interestoken>;
          using inheritance_action = eosio::action_wrapper<"inheritance"_n, &flex_token::inheritance>;
          using inheritmemo_action = eosio::action_wrapper<"inheritmemo"_n, &flex_token::inheritmemo>;
+         using setswap_action = eosio::action_wrapper<"setswap"_n, &flex_token::setswap>;
+         using setexempt_action = eosio::action_wrapper<"setexempt"_n, &flex_token::setexempt>;
+         using openpool_action = eosio::action_wrapper<"openpool"_n, &flex_token::openpool>;
+         using seedpool_action = eosio::action_wrapper<"seedpool"_n, &flex_token::seedpool>;
+         using collectpool_action = eosio::action_wrapper<"collectpool"_n, &flex_token::collectpool>;
 
       private:
          TABLE account {
@@ -117,9 +138,39 @@ namespace eosio {
          using stats = eosio::multi_index<"stat"_n, currency_stats>;
          using flexers = eosio::multi_index<"flexers"_n, flexer>;
 
+         TABLE vault {
+            uint64_t       id = 0;
+            uint64_t       alcor_pool_id = 0;
+            name           swap;
+            extended_asset token_a;
+            extended_asset token_b;
+            uint32_t       fee = 0;
+            int32_t        tick_lower = 0;
+            int32_t        tick_upper = 0;
+            uint32_t       unlock_time = 0;
+            bool           seeded = false;
+            uint64_t primary_key() const { return id; }
+         };
+
+         TABLE exempt {
+            name account;
+            uint64_t primary_key() const { return account.value; }
+         };
+
+         struct [[eosio::table("swapcfg")]] swapcfg {
+            name swap;
+         };
+
+         using vaults = eosio::multi_index<"vaults"_n, vault>;
+         using exempts = eosio::multi_index<"exempts"_n, exempt>;
+         using swap_singleton = eosio::singleton<"swapcfg"_n, swapcfg>;
+
          void sub_balance(const name& owner, const asset& value);
          void add_balance(const name& owner, const asset& value, const name& ram_payer);
          void update_flex_balance(const name& owner, const asset& value);
          void set_distribution_config(const symbol& sym, uint64_t start, uint32_t lim, uint16_t reflection_rate, uint16_t burn_rate, uint16_t project_rate, const name& project_account);
+         name swap_account() const;
+         bool fee_exempt(const name& account) const;
+         bool tokens_sorted(const extended_asset& a, const extended_asset& b) const;
    };
 } 

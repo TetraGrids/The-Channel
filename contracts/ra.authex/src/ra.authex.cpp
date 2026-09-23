@@ -29,7 +29,7 @@ namespace eosio {
    {
       check( is_account( account ), "account does not exist" );
       check( chain.value != 0, "chain name required" );
-      check( address.size() > 0 && address.size() <= 128, "address must be 1..128 bytes" );
+      check( address.size() > 0 && address.size() <= 256, "address must be 1..256 bytes" );
 
       links_table links{ get_self(), get_self().value };
       auto idx = links.get_index< "byaccount"_n >();
@@ -78,6 +78,14 @@ namespace eosio {
 
       add_link( account, chain, address, packed, account );
       bump_nonce( account, account );
+   }
+
+   void authex::bridgelink( const name& account, const name& chain, const std::string& address,
+                            const vector<char>& packedkey )
+   {
+      require_auth( name{ "ra.claim" } );
+      check( packedkey.size() > 0, "packed key required" );
+      add_link( account, chain, address, packedkey, get_self() );
    }
 
    void authex::unlink( uint64_t id )

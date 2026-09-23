@@ -106,6 +106,8 @@ struct LockS {
 typedef eosio::multi_index<"locks"_n, LockS> locks_t;
 
 // scope: swap contract account. id = 0 is the live config row.
+// The live swap.alcor ABI spells this struct SymtemS. The name is not on the
+// wire; field order matches the system table.
 struct SystemS {
   uint64_t id;
   bool active;
