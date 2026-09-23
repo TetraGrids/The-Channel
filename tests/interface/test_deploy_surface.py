@@ -40,7 +40,13 @@ REQUIRED = {
         "init": [("version", "varuint32"), ("core", "symbol")],
         "newaccount": [("creator", "name"), ("name", "name"), ("owner", "authority"), ("active", "authority")],
         "buyrambytes": [("payer", "name"), ("receiver", "name"), ("bytes", "uint32")],
-        "setcode": [("account", "name"), ("vmtype", "uint8"), ("vmversion", "uint8"), ("code", "bytes")],
+        "setcode": [
+            ("account", "name"),
+            ("vmtype", "uint8"),
+            ("vmversion", "uint8"),
+            ("code", "bytes"),
+            ("memo", "string$"),
+        ],
     },
     "ra.authex": {
         "createlink": [("account", "name"), ("chain", "name"), ("address", "string")],
